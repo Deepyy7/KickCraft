@@ -353,5 +353,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith ("file://") || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith ("file://") || url.startsWith ("data:") || url.startsWith ("blob:") || url.startsWith ("javascript:");
 }
