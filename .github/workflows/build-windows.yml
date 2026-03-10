@@ -1,7 +1,7 @@
 name: Build KickCraft VST3 (Windows)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # run manually from GitHub UI
 
 jobs:
   build-windows:
@@ -23,6 +23,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path webview2_sdk/build/native/x64
           Copy-Item "$($sdk.FullName)/build/native/include/*" webview2_sdk/build/native/include/ -Recurse
           Copy-Item "$($sdk.FullName)/build/native/x64/WebView2LoaderStatic.lib" webview2_sdk/build/native/x64/
+          Copy-Item "$($sdk.FullName)/build/native/x64/WebView2Loader.dll" webview2_sdk/build/native/x64/
         shell: pwsh
 
       - name: Configure CMake
@@ -35,6 +36,13 @@ jobs:
       - name: Build VST3
         run: |
           cmake --build build_release --config Release --target KickCraft_VST3
+        shell: pwsh
+
+      - name: Copy WebView2Loader.dll into VST3 bundle
+        run: |
+          $dll = "webview2_sdk/build/native/x64/WebView2Loader.dll"
+          $dest = "build_release/KickCraft_artefacts/Release/VST3/KickCraft.vst3/Contents/x86_64-win/"
+          Copy-Item $dll $dest
         shell: pwsh
 
       - name: Upload VST3 artifact
