@@ -20,14 +20,18 @@ private:
 
     struct KickWebView : public juce::WebBrowserComponent
     {
-        KickWebView (KickCraftEditor& o) : owner(o) {}
+        KickWebView (KickCraftEditor& o)
+            : juce::WebBrowserComponent (
+                juce::WebBrowserComponent::Options{}
+                    .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+                    .withWinWebView2Options (
+                        juce::WebBrowserComponent::Options::WinWebView2{}
+                            .withUserDataFolder (juce::File::getSpecialLocation (
+                                juce::File::SpecialLocationType::tempDirectory)))
+                    .withKeepPageLoadedWhenBrowserIsHidden()),
+              owner (o) {}
+
         bool pageAboutToLoad (const juce::String& url) override;
-
-        void evaluateJavascript (const juce::String& script)
-        {
-            goToURL ("javascript:void(function(){\n" + script + "\n}())");
-        }
-
         KickCraftEditor& owner;
     };
 
@@ -36,22 +40,19 @@ private:
     bool firstCallDone { false };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
-    // WAV export — chunk assembly (message thread only)
     juce::String      wavB64Accumulator;
     int               chunksTotal    { 0 };
     int               chunksReceived { 0 };
     std::atomic<bool> allChunksReady { false };
 
-    // Kick save — chunk assembly for restore after minimize (message thread only)
     juce::String      saveKickB64Accumulator;
     int               saveKickChunksTotal    { 0 };
     int               saveKickChunksReceived { 0 };
     std::atomic<bool> saveKickReady          { false };
 
-    // Kick restore — chunked C++→JS injection (message thread only)
     juce::StringArray kickRestoreChunks;
-    int               kickRestoreIdx  { -1 };    // -1 = idle
-    bool              kickRestoreDone { false };  // true after first restore completes
+    int               kickRestoreIdx  { -1 };
+    bool              kickRestoreDone { false };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (KickCraftEditor)
 };
