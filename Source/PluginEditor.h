@@ -27,7 +27,8 @@ private:
                     .withWinWebView2Options (
                         juce::WebBrowserComponent::Options::WinWebView2{}
                             .withUserDataFolder (juce::File::getSpecialLocation (
-                                juce::File::SpecialLocationType::tempDirectory)))
+                                juce::File::SpecialLocationType::userApplicationDataDirectory)
+                                .getChildFile ("KickCraft")))
                     .withKeepPageLoadedWhenBrowserIsHidden()),
               owner (o) {}
 
@@ -43,7 +44,6 @@ private:
     juce::String      wavB64Accumulator;
     int               chunksTotal    { 0 };
     int               chunksReceived { 0 };
-    int               kickPollCounter { 0 };
     std::atomic<bool> allChunksReady { false };
 
     juce::String      saveKickB64Accumulator;

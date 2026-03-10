@@ -70,11 +70,24 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     }
   };
 
-  // Store loaded kick b64 in JS global — C++ polls via evaluateJavascript callback
-  window.__kickcraft__._currentKickB64 = null;
+  // Save kick to localStorage — persists in WebView2 UserDataFolder across editor instances
   window.__kickcraft__._sendKickB64 = function(b64) {
-    window.__kickcraft__._currentKickB64 = b64;
+    try { localStorage.setItem('kickcraft_last_kick', b64); } catch(e) {}
   };
+  // Auto-restore on load
+  (function() {
+    try {
+      var saved = localStorage.getItem('kickcraft_last_kick');
+      if (saved) {
+        window.addEventListener('load', function() {
+          setTimeout(function() {
+            if (window.__kickcraft__ && window.__kickcraft__.restoreKickFromB64)
+              window.__kickcraft__.restoreKickFromB64(saved);
+          }, 300);
+        });
+      }
+    } catch(e) {}
+  })();
 
 })();
 </script>
@@ -150,26 +163,6 @@ void KickCraftEditor::timerCallback()
     }
 
     if (paramsNeedSync.exchange (false)) syncAllParamsToUI();
-
-    // Poll JS for kick b64 every ~100ms until we have it
-    kickPollCounter++;
-    if (kickPollCounter >= 3 && processor.savedKickB64.isEmpty())
-    {
-        kickPollCounter = 0;
-        webView.evaluateJavascript (
-            "window.__kickcraft__&&window.__kickcraft__._currentKickB64"
-            "?window.__kickcraft__._currentKickB64:''",
-            [this](juce::WebBrowserComponent::EvaluationResult result)
-            {
-                if (auto* v = result.getResult())
-                    if (v->isString())
-                    {
-                        auto b64 = v->toString();
-                        if (b64.isNotEmpty())
-                            processor.savedKickB64 = b64;
-                    }
-            });
-    }
 
     // Send one restore chunk per tick — safe size for WKWebView evaluateJavascript
     if (kickRestoreIdx >= 0 && kickRestoreIdx < kickRestoreChunks.size())
