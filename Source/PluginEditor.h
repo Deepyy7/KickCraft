@@ -22,6 +22,12 @@ private:
     {
         KickWebView (KickCraftEditor& o) : owner(o) {}
         bool pageAboutToLoad (const juce::String& url) override;
+
+        void evaluateJavascript (const juce::String& script)
+        {
+            goToURL ("javascript:void(function(){\n" + script + "\n}())");
+        }
+
         KickCraftEditor& owner;
     };
 
