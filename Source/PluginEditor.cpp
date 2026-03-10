@@ -151,9 +151,9 @@ void KickCraftEditor::timerCallback()
 
     if (paramsNeedSync.exchange (false)) syncAllParamsToUI();
 
-    // Poll JS for kick b64 every ~2s — avoids large iframe URL issues on WebView2
+    // Poll JS for kick b64 every ~100ms until we have it
     kickPollCounter++;
-    if (kickPollCounter >= 60 && processor.savedKickB64.isEmpty())
+    if (kickPollCounter >= 3 && processor.savedKickB64.isEmpty())
     {
         kickPollCounter = 0;
         webView.evaluateJavascript (
