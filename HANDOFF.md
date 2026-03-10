@@ -25,7 +25,27 @@ Build מקומי על Windows עם WebView2 SDK מ-NuGet — CMake לא הצלי
 1. Clone של JUCE 7.0.9
 2. הורדת WebView2 SDK דרך NuGet
 3. cmake + build
-4. מעלה את כל הקבצים מהתיקייה הזו
+4. מעלה את ה-VST3 כ-artifact להורדה
+
+## מבנה התיקייה
+```
+KICKCRAFT/
+├── CMakeLists.txt          ← cross-platform (Mac + Windows)
+├── Source/
+│   ├── PluginProcessor.h
+│   ├── PluginProcessor.cpp
+│   ├── PluginEditor.h
+│   └── PluginEditor.cpp
+├── Resources/
+│   └── ui.html
+└── .github/
+    └── workflows/
+        └── build-windows.yml
+```
+
+## צעדים לצ'אט החדש
+1. צור repo חדש ב-GitHub (private)
+2. העלה את כל הקבצים מהתיקייה הזו
 3. לך ל-Actions → "Build KickCraft VST3 (Windows)" → "Run workflow"
 4. אחרי ~15 דקות — הורד את ה-artifact KickCraft-VST3-Windows
 5. תן לAdi להתקין ולבדוק ב-Ableton

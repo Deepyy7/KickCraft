@@ -44,6 +44,7 @@ target_compile_definitions(KickCraft PUBLIC
     $<$<BOOL:${MSVC}>:JUCE_USE_WIN_WEBVIEW2=1>
 )
 
+# ── WebView2 SDK (Windows only) ────────────────────────────────────
 if(MSVC)
     set(WEBVIEW2_SDK_PATH "${CMAKE_CURRENT_SOURCE_DIR}/webview2_sdk")
     target_include_directories(KickCraft PRIVATE
@@ -62,4 +63,6 @@ target_link_libraries(KickCraft PRIVATE
     juce::juce_dsp
     juce::juce_gui_extra
     juce::juce_recommended_config_flags
+    $<$<NOT:$<BOOL:${MSVC}>>:juce::juce_recommended_lto_flags>
+    $<$<NOT:$<BOOL:${MSVC}>>:juce::juce_recommended_warning_flags>
 )
