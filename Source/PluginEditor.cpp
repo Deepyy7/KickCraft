@@ -70,22 +70,24 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     }
   };
 
-  // Save kick to localStorage — persists in WebView2 UserDataFolder across editor instances
+  // Save kick to localStorage
   window.__kickcraft__._sendKickB64 = function(b64) {
-    try { localStorage.setItem('kickcraft_last_kick', b64); } catch(e) {}
+    try { localStorage.setItem('kc_kick', b64); } catch(e) {}
   };
-  // Auto-restore on load
+  // Auto-restore: retry until page JS ready
   (function() {
     try {
-      var saved = localStorage.getItem('kickcraft_last_kick');
-      if (saved) {
-        window.addEventListener('load', function() {
-          setTimeout(function() {
-            if (window.__kickcraft__ && window.__kickcraft__.restoreKickFromB64)
-              window.__kickcraft__.restoreKickFromB64(saved);
-          }, 300);
-        });
+      var saved = localStorage.getItem('kc_kick');
+      if (!saved) return;
+      function tryRestore() {
+        if (typeof initAudio === 'function' && window.__kickcraft__ &&
+            window.__kickcraft__.restoreKickFromB64) {
+          window.__kickcraft__.restoreKickFromB64(saved);
+        } else {
+          setTimeout(tryRestore, 200);
+        }
       }
+      setTimeout(tryRestore, 600);
     } catch(e) {}
   })();
 
