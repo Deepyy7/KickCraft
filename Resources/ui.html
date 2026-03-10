@@ -1311,16 +1311,13 @@ function exportKickToWav() {
       q.push('juce://chunk?n=' + n + '&total=' + total +
              '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK)));
     }
-    var sending = false;
+    var idx = 0;
     function nextChunk() {
-      if (q.length === 0) { sending = false; return; }
-      var item = q.shift();
-      var f = document.getElementById('__juce_bridge__');
-      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-      f.src = item;
-      setTimeout(nextChunk, 12);
+      if (idx >= q.length) return;
+      window.location.href = q[idx++];
+      setTimeout(nextChunk, 20);
     }
-    if (!sending) { sending = true; nextChunk(); }
+    nextChunk();
   }).catch(function(err) {
     alert('Export failed: ' + err.message);
   });
@@ -1414,9 +1411,7 @@ window.__kickcraft__.receiveParam = function(id, value) {
 };
 window.__kickcraft__.sendParam = function(id, value) {
   try {
-    var f = document.getElementById('__juce_bridge__');
-    if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-    f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+    window.location.href = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
   } catch(e) {}
 };
 </script>

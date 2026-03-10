@@ -19,9 +19,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   window.__kickcraft__.sendParam = function(id, value) {
     try {
-      var f = document.getElementById('__juce_bridge__');
-      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-      f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+      window.location.href = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
     } catch(e) {}
   };
 
@@ -39,9 +37,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   window.__kickcraft__.exportKick = function() {
     try {
-      var f = document.getElementById('__juce_bridge__');
-      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-      f.src = 'juce://export';
+      window.location.href = 'juce://export';
     } catch(e) {}
   };
 
@@ -73,12 +69,10 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   // Send loaded kick as base64 chunks to C++ for persistent storage
   window.__kickcraft__._sendKickB64 = function(b64) {
     var CHUNK = 8000, total = Math.ceil(b64.length / CHUNK);
-    var f = document.getElementById('__juce_bridge__');
-    if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
     function send(n) {
       if (n >= total) return;
-      f.src = 'juce://savekick?n=' + n + '&total=' + total + '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK));
-      setTimeout(function(){ send(n + 1); }, 12);
+      window.location.href = 'juce://savekick?n=' + n + '&total=' + total + '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK));
+      setTimeout(function(){ send(n + 1); }, 20);
     }
     send(0);
   };
@@ -122,11 +116,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
                          .getChildFile("kickcraft_ui.html");
     tmp.replaceWithText (html);
-   #if defined(_WIN32)
-    webView.goToURL ("file:///" + tmp.getFullPathName().replaceCharacter ('\\', '/'));
-   #else
     webView.goToURL ("file://" + tmp.getFullPathName());
-   #endif
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
@@ -357,5 +347,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith ("file://") || url.startsWith ("data:") || url.startsWith ("blob:") || url.startsWith ("javascript:");
+    return url.startsWith ("file://") || url.startsWith ("data:") || url.startsWith ("blob:");
 }
