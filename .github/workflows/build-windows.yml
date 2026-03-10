@@ -1,0 +1,44 @@
+name: Build KickCraft VST3 (Windows)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install JUCE
+        run: |
+          git clone --depth 1 --branch 7.0.9 https://github.com/juce-framework/JUCE.git C:/JUCE
+
+      - name: Install WebView2 SDK via NuGet
+        run: |
+          nuget install Microsoft.Web.WebView2 -Version 1.0.2478.35 -OutputDirectory webview2_nuget
+          $sdk = Get-ChildItem -Path webview2_nuget -Filter "Microsoft.Web.WebView2.*" -Directory | Select-Object -First 1
+          New-Item -ItemType Directory -Force -Path webview2_sdk/build/native/include
+          New-Item -ItemType Directory -Force -Path webview2_sdk/build/native/x64
+          Copy-Item "$($sdk.FullName)/build/native/include/*" webview2_sdk/build/native/include/ -Recurse
+          Copy-Item "$($sdk.FullName)/build/native/x64/WebView2LoaderStatic.lib" webview2_sdk/build/native/x64/
+        shell: pwsh
+
+      - name: Configure CMake
+        run: |
+          cmake -B build_release `
+            -DJUCE_PATH=C:/JUCE `
+            -DCMAKE_BUILD_TYPE=Release
+        shell: pwsh
+
+      - name: Build VST3
+        run: |
+          cmake --build build_release --config Release --target KickCraft_VST3
+        shell: pwsh
+
+      - name: Upload VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KickCraft-VST3-Windows
+          path: build_release/KickCraft_artefacts/Release/VST3/
