@@ -119,9 +119,14 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    juce::MemoryOutputStream encoded;
-    juce::Base64::convertToBase64 (encoded, html.toRawUTF8(), html.getNumBytesAsUTF8());
-    webView.goToURL ("data:text/html;base64," + encoded.toString());
+    juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                         .getChildFile("kickcraft_ui.html");
+    tmp.replaceWithText (html);
+   #if defined(_WIN32)
+    webView.goToURL ("file:///" + tmp.getFullPathName().replaceCharacter ('\\', '/'));
+   #else
+    webView.goToURL ("file://" + tmp.getFullPathName());
+   #endif
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
