@@ -14,8 +14,12 @@ jobs:
       - name: Install JUCE 8
         run: git clone --depth 1 --branch 8.0.12 https://github.com/juce-framework/JUCE.git C:/JUCE
 
+      - name: Install WebView2 via NuGet
+        run: nuget install Microsoft.Web.WebView2 -Version 1.0.3485.44 -OutputDirectory C:/nuget
+        shell: pwsh
+
       - name: Configure CMake
-        run: cmake -B build_release -DJUCE_PATH=C:/JUCE -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build_release -DJUCE_PATH=C:/JUCE -DCMAKE_BUILD_TYPE=Release -DJUCE_WEBVIEW2_PACKAGE_LOCATION=C:/nuget
 
       - name: Build VST3
         run: cmake --build build_release --config Release --target KickCraft_VST3
