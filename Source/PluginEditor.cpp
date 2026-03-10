@@ -19,7 +19,9 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   window.__kickcraft__.sendParam = function(id, value) {
     try {
-      window.location.href = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+      var f = document.getElementById('__juce_bridge__');
+      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
+      f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
     } catch(e) {}
   };
 
@@ -37,7 +39,9 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   window.__kickcraft__.exportKick = function() {
     try {
-      window.location.href = 'juce://export';
+      var f = document.getElementById('__juce_bridge__');
+      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
+      f.src = 'juce://export';
     } catch(e) {}
   };
 
@@ -68,11 +72,12 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   // Send loaded kick as base64 chunks to C++ for persistent storage
   window.__kickcraft__._sendKickB64 = function(b64) {
-    var CHUNK = 8000, total = Math.ceil(b64.length / CHUNK);
+    var CHUNK = 1500, total = Math.ceil(b64.length / CHUNK);
+    var f2 = document.createElement('iframe'); f2.style.display='none'; document.body.appendChild(f2);
     function send(n) {
-      if (n >= total) return;
-      window.location.href = 'juce://savekick?n=' + n + '&total=' + total + '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK));
-      setTimeout(function(){ send(n + 1); }, 20);
+      if (n >= total) { return; }
+      f2.src = 'juce://savekick?n=' + n + '&total=' + total + '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK));
+      setTimeout(function(){ send(n + 1); }, 80);
     }
     send(0);
   };
