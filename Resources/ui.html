@@ -1412,7 +1412,9 @@ window.__kickcraft__.receiveParam = function(id, value) {
 };
 window.__kickcraft__.sendParam = function(id, value) {
   try {
-    window.location.href = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+    var f = document.getElementById('__juce_bridge__');
+    if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
+    f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
   } catch(e) {}
 };
 </script>
