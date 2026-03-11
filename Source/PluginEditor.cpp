@@ -70,26 +70,26 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     }
   };
 
-  // Save kick to localStorage
+  // Save kick to C++ processor via chunked bridge (survives editor destroy/recreate)
   window.__kickcraft__._sendKickB64 = function(b64) {
-    try { localStorage.setItem('kc_kick', b64); } catch(e) {}
+    var CHUNK = 4000;
+    var total = Math.ceil(b64.length / CHUNK) || 1;
+    var q = [];
+    for (var n = 0; n < total; n++) {
+      q.push('juce://savekick?n=' + n + '&total=' + total +
+             '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK)));
+    }
+    var sf = document.createElement('iframe');
+    sf.style.display = 'none';
+    document.body.appendChild(sf);
+    var idx = 0;
+    function nextChunk() {
+      if (idx >= q.length) return;
+      sf.src = q[idx++];
+      setTimeout(nextChunk, 50);
+    }
+    nextChunk();
   };
-  // Auto-restore: retry until page JS ready
-  (function() {
-    try {
-      var saved = localStorage.getItem('kc_kick');
-      if (!saved) return;
-      function tryRestore() {
-        if (typeof initAudio === 'function' && window.__kickcraft__ &&
-            window.__kickcraft__.restoreKickFromB64) {
-          window.__kickcraft__.restoreKickFromB64(saved);
-        } else {
-          setTimeout(tryRestore, 200);
-        }
-      }
-      setTimeout(tryRestore, 600);
-    } catch(e) {}
-  })();
 
 })();
 </script>
