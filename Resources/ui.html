@@ -651,14 +651,6 @@ function loadFileObj(file) {
     }, function() { alert('Could not decode audio file.'); });
   };
   reader.readAsArrayBuffer(file);
-  // Send kick to C++ for restore after minimize/reopen
-  var r2 = new FileReader();
-  r2.onload = function(e2) {
-    var b64 = e2.target.result.split(',')[1];
-    if (window.__kickcraft__ && window.__kickcraft__._sendKickB64)
-      window.__kickcraft__._sendKickB64(b64);
-  };
-  r2.readAsDataURL(file);
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1130,7 +1122,6 @@ function buildKnobs() {
           window.removeEventListener('mousemove', onMove);
           window.removeEventListener('mouseup',   onUp);
           pushUndo();
-          if (window.__kickcraft__) window.__kickcraft__.sendParam(k_.id, kv[k_.id]);
         }
         cvs_.addEventListener('mousedown', function(e) {
           e.preventDefault(); sy = e.clientY; sv = kv[k_.id];
@@ -1148,7 +1139,6 @@ function buildKnobs() {
         }, { passive: true });
         cvs_.addEventListener('dblclick', function() {
           pushUndo(); kv[k_.id] = k_.def; renderKnob(cvs_, sz_, k_.def, k_); applyDSP(); drawWaveform();
-          if (window.__kickcraft__) window.__kickcraft__.sendParam(k_.id, k_.def);
         });
       }(cvs, sz, k));
     });
@@ -1422,53 +1412,8 @@ window.__kickcraft__.receiveParam = function(id, value) {
 };
 window.__kickcraft__.sendParam = function(id, value) {
   try {
-    var f = document.getElementById('__juce_bridge__');
-    if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-    f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+    window.location.href = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
   } catch(e) {}
-};
-
-// Send kick B64 to C++ via chunked juce://savekick bridge
-window.__kickcraft__._sendKickB64 = function(b64) {
-  var CHUNK = 32000;
-  var total = Math.ceil(b64.length / CHUNK) || 1;
-  var q = [];
-  for (var n = 0; n < total; n++) {
-    q.push('juce://savekick?n=' + n + '&total=' + total +
-           '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK)));
-  }
-  var idx = 0;
-  function nextChunk() {
-    if (idx >= q.length) return;
-    window.location.href = q[idx++];
-    setTimeout(nextChunk, 10);
-  }
-  nextChunk();
-};
-
-// Restore kick from B64 (called by C++ after minimize/reopen)
-window.__kickcraft__.restoreKickFromB64 = function(b64) {
-  if (!b64) return;
-  initAudio();
-  if (actx.state === 'suspended') actx.resume();
-  try {
-    var bin = atob(b64), len = bin.length;
-    var ab = new ArrayBuffer(len), v = new Uint8Array(ab);
-    for (var i = 0; i < len; i++) v[i] = bin.charCodeAt(i);
-    actx.decodeAudioData(ab, function(buf) {
-      audioBuf = buf; extractWave(buf); drawWaveform();
-    });
-  } catch(e) {}
-};
-
-// Receive restore chunks from C++ (chunked to stay under JS size limit)
-window.__kickcraft__._receiveRestoreChunk = function(n, total, data) {
-  if (n === 0) window.__kickcraft__._restoreBuf = '';
-  window.__kickcraft__._restoreBuf += data;
-  if (n === total - 1) {
-    window.__kickcraft__.restoreKickFromB64(window.__kickcraft__._restoreBuf);
-    window.__kickcraft__._restoreBuf = '';
-  }
 };
 </script>
 
