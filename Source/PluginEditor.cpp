@@ -11,6 +11,9 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
     juce::String html (BinaryData::ui_html, BinaryData::ui_htmlSize);
 
+    // Normalize line endings (Windows Git checkout converts \n -> \r\n in BinaryData)
+    html = html.replace ("\r\n", "\n");
+
     // JS bridge injection
     juce::String bridge = R"BRIDGE(
 <script>
@@ -90,6 +93,22 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     }
     nextChunk();
   };
+  // Auto-restore: retry until page JS ready
+  (function() {
+    try {
+      var saved = localStorage.getItem('kc_kick');
+      if (!saved) return;
+      function tryRestore() {
+        if (typeof initAudio === 'function' && window.__kickcraft__ &&
+            window.__kickcraft__.restoreKickFromB64) {
+          window.__kickcraft__.restoreKickFromB64(saved);
+        } else {
+          setTimeout(tryRestore, 200);
+        }
+      }
+      setTimeout(tryRestore, 600);
+    } catch(e) {}
+  })();
 
 })();
 </script>
