@@ -1422,10 +1422,7 @@ window.__kickcraft__.receiveParam = function(id, value) {
 };
 window.__kickcraft__.sendParam = function(id, value) {
   try {
-    var f = document.createElement('iframe');
-    f.style.display = 'none';
-    document.body.appendChild(f);
-    f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+    window.location.href = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
   } catch(e) {}
 };
 
@@ -1438,14 +1435,11 @@ window.__kickcraft__._sendKickB64 = function(b64) {
     q.push('juce://savekick?n=' + n + '&total=' + total +
            '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK)));
   }
-  var sf = document.createElement('iframe');
-  sf.style.display = 'none';
-  document.body.appendChild(sf);
   var idx = 0;
   function nextChunk() {
     if (idx >= q.length) return;
-    sf.src = q[idx++];
-    setTimeout(nextChunk, 50);
+    window.location.href = q[idx++];
+    setTimeout(nextChunk, 80);
   }
   nextChunk();
 };
