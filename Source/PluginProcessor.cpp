@@ -193,24 +193,10 @@ void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 }
 
 void KickCraftProcessor::getStateInformation(juce::MemoryBlock& d)
-{
-    auto s = apvts.copyState();
-    if (savedKickB64.isNotEmpty())
-        s.setProperty ("savedKickB64", savedKickB64, nullptr);
-    std::unique_ptr<juce::XmlElement> x (s.createXml());
-    copyXmlToBinary (*x, d);
-}
+{ auto s=apvts.copyState(); std::unique_ptr<juce::XmlElement> x(s.createXml()); copyXmlToBinary(*x,d); }
 
 void KickCraftProcessor::setStateInformation(const void* d, int sz)
-{
-    std::unique_ptr<juce::XmlElement> x (getXmlFromBinary (d, sz));
-    if (x && x->hasTagName (apvts.state.getType()))
-    {
-        auto tree = juce::ValueTree::fromXml (*x);
-        savedKickB64 = tree.getProperty ("savedKickB64", "").toString();
-        apvts.replaceState (tree);
-    }
-}
+{ std::unique_ptr<juce::XmlElement> x(getXmlFromBinary(d,sz)); if(x&&x->hasTagName(apvts.state.getType())) apvts.replaceState(juce::ValueTree::fromXml(*x)); }
 
 juce::AudioProcessorEditor* KickCraftProcessor::createEditor() { return new KickCraftEditor(*this); }
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new KickCraftProcessor(); }
