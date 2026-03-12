@@ -34,10 +34,12 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   window.__kickcraft__.sendParam = function(id, value) {
     try {
+      window.__JUCE__.backend.emitEvent('sendParam', {id: id, value: value});
+    } catch(e) {
       window.__kickcraft__._nav(
         'juce://param?id=' + encodeURIComponent(id) +
         '&value='          + encodeURIComponent(String(value)));
-    } catch(e) {}
+    }
   };
 
   window.__kickcraft__.receiveParam = function(id, value) {
@@ -53,7 +55,11 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
   window.__kickcraft__.exportKick = function() {
-    try { window.__kickcraft__._nav('juce://export'); } catch(e) {}
+    try {
+      window.__JUCE__.backend.emitEvent('exportkick', {});
+    } catch(e) {
+      window.__kickcraft__._nav('juce://export');
+    }
   };
 
   // Restore a previously loaded kick from base64 (called after minimize/reopen)
@@ -81,18 +87,11 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     }
   };
 
-  // Send loaded kick as base64 chunks to C++ for persistent storage
+  // Send loaded kick as base64 to C++ for persistent storage
   window.__kickcraft__._sendKickB64 = function(b64) {
-    var CHUNK = 8000, total = Math.ceil(b64.length / CHUNK);
-    function send(n) {
-      if (n >= total) return;
-      window.__kickcraft__._nav(
-        'juce://savekick?n=' + n +
-        '&total=' + total +
-        '&data=' + encodeURIComponent(b64.slice(n * CHUNK, (n + 1) * CHUNK)));
-      setTimeout(function(){ send(n + 1); }, 30);
-    }
-    send(0);
+    try {
+      window.__JUCE__.backend.emitEvent('savekick', {b64: b64});
+    } catch(e) {}
   };
 
 })();
