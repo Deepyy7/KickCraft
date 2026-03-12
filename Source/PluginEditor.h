@@ -29,7 +29,29 @@ private:
                             .withUserDataFolder (juce::File::getSpecialLocation (
                                 juce::File::SpecialLocationType::userApplicationDataDirectory)
                                 .getChildFile ("KickCraft")))
-                    .withKeepPageLoadedWhenBrowserIsHidden()),
+                    .withKeepPageLoadedWhenBrowserIsHidden()
+            .withNativeIntegrationEnabled()
+            .withEventListener (juce::Identifier ("sendParam"),
+                [p = &o](const juce::var& data) {
+                    auto id  = data["id"].toString();
+                    auto val = static_cast<float> (static_cast<double> (data["value"]));
+                    juce::MessageManager::callAsync ([p, id, val] {
+                        if (auto* param = p->processor.apvts.getParameter (id))
+                            param->setValueNotifyingHost (
+                                param->getNormalisableRange().convertTo0to1 (val));
+                    });
+                })
+            .withEventListener (juce::Identifier ("exportkick"),
+                [p = &o](const juce::var&) {
+                    p->processor.exportRequested = true;
+                })
+            .withEventListener (juce::Identifier ("savekick"),
+                [p = &o](const juce::var& data) {
+                    auto b64 = data["b64"].toString();
+                    juce::MessageManager::callAsync ([p, b64] {
+                        p->processor.savedKickB64 = b64;
+                    });
+                })),
               owner (o) {}
 
         bool pageAboutToLoad (const juce::String& url) override;
