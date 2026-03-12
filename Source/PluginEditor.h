@@ -30,28 +30,35 @@ private:
                                 juce::File::SpecialLocationType::userApplicationDataDirectory)
                                 .getChildFile ("KickCraft")))
                     .withKeepPageLoadedWhenBrowserIsHidden()
-            .withNativeIntegrationEnabled()
-            .withEventListener (juce::Identifier ("sendParam"),
-                [p = &o](const juce::var& data) {
-                    auto id  = data["id"].toString();
-                    auto val = static_cast<float> (static_cast<double> (data["value"]));
-                    juce::MessageManager::callAsync ([p, id, val] {
-                        if (auto* param = p->processor.apvts.getParameter (id))
-                            param->setValueNotifyingHost (
-                                param->getNormalisableRange().convertTo0to1 (val));
-                    });
-                })
-            .withEventListener (juce::Identifier ("exportkick"),
-                [p = &o](const juce::var&) {
-                    p->processor.exportRequested = true;
-                })
-            .withEventListener (juce::Identifier ("savekick"),
-                [p = &o](const juce::var& data) {
-                    auto b64 = data["b64"].toString();
-                    juce::MessageManager::callAsync ([p, b64] {
-                        p->processor.savedKickB64 = b64;
-                    });
-                })),
+                    .withNativeIntegrationEnabled()
+                    .withInitialisationData (juce::Identifier ("params"), [&o]() -> juce::var {
+                        juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+                        static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
+                        for (int i = 0; ids[i]; ++i)
+                            obj->setProperty (ids[i], (double) o.processor.apvts.getRawParameterValue (ids[i])->load());
+                        return juce::var (obj.get());
+                    }())
+                    .withEventListener (juce::Identifier ("sendParam"),
+                        [p = &o](const juce::var& data) {
+                            auto id  = data["id"].toString();
+                            auto val = static_cast<float> (static_cast<double> (data["value"]));
+                            juce::MessageManager::callAsync ([p, id, val] {
+                                if (auto* param = p->processor.apvts.getParameter (id))
+                                    param->setValueNotifyingHost (
+                                        param->getNormalisableRange().convertTo0to1 (val));
+                            });
+                        })
+                    .withEventListener (juce::Identifier ("exportkick"),
+                        [p = &o](const juce::var&) {
+                            p->processor.exportRequested = true;
+                        })
+                    .withEventListener (juce::Identifier ("savekick"),
+                        [p = &o](const juce::var& data) {
+                            auto b64 = data["b64"].toString();
+                            juce::MessageManager::callAsync ([p, b64] {
+                                p->processor.savedKickB64 = b64;
+                            });
+                        })),
               owner (o) {}
 
         bool pageAboutToLoad (const juce::String& url) override;
