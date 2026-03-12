@@ -35,11 +35,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   window.__kickcraft__.sendParam = function(id, value) {
     try {
       window.__JUCE__.backend.emitEvent('sendParam', {id: id, value: value});
-    } catch(e) {
-      window.__kickcraft__._nav(
-        'juce://param?id=' + encodeURIComponent(id) +
-        '&value='          + encodeURIComponent(String(value)));
-    }
+    } catch(e) {}
   };
 
   window.__kickcraft__.receiveParam = function(id, value) {
@@ -57,9 +53,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   window.__kickcraft__.exportKick = function() {
     try {
       window.__JUCE__.backend.emitEvent('exportkick', {});
-    } catch(e) {
-      window.__kickcraft__._nav('juce://export');
-    }
+    } catch(e) {}
   };
 
   // Restore a previously loaded kick from base64 (called after minimize/reopen)
@@ -93,6 +87,23 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
       window.__JUCE__.backend.emitEvent('savekick', {b64: b64});
     } catch(e) {}
   };
+
+  // Apply param values passed from C++ on editor open
+  (function() {
+    function applyInitParams() {
+      try {
+        var p = window.__JUCE__.initialisationData.params;
+        if (!p) return;
+        var ids = Object.keys(p);
+        for (var i = 0; i < ids.length; i++) {
+          window.__kickcraft__.receiveParam(ids[i], p[ids[i]]);
+        }
+      } catch(e) {
+        setTimeout(applyInitParams, 200);
+      }
+    }
+    setTimeout(applyInitParams, 400);
+  })();
 
 })();
 </script>
