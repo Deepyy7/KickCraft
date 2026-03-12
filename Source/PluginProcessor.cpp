@@ -136,10 +136,10 @@ void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
         for (int ch=0; ch<CH; ++ch) {
             float x = buffer.getSample(ch,s) * transEnv;
-            x = ch==0 ? subL.procestSample(x)    : subR.procestSample(x);
+            x = ch==0 ? subL.processSample(x)    : subR.processSample(x);
             x = ch==0 ? punchL.processSample(x)  : punchR.processSample(x);
             x = ch==0 ? bodyL.processSample(x)   : bodyR.processSample(x);
-            float cb = ch==0 ? clickBpL.processSample(x) : clickBpR.procestSample(x);
+            float cb = ch==0 ? clickBpL.processSample(x) : clickBpR.processSample(x);
             x += cb * click * 6.f;
             x = ch==0 ? airL.processSample(x) : airR.processSample(x);
             if (sat>0.001f) { float d=1.f+sat*3.f; x=softClip(x*d)/softClip(d); }
