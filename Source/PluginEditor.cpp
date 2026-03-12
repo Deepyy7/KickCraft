@@ -17,11 +17,26 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 (function() {
   if (!window.__kickcraft__) window.__kickcraft__ = {};
 
+  // ── Navigation queue ─────────────────────────────────────────────────────────
+  // WebView2 (Windows) only fires pageAboutToLoad for TOP-LEVEL navigations.
+  // iframe.src = 'juce://...' is silently ignored on Windows.
+  // window.location.href works — pageAboutToLoad returns false to cancel it.
+  // Queue serialises rapid calls so they don't collide.
+  var _q = [], _busy = false;
+  function _pump() {
+    if (_busy || _q.length === 0) return;
+    _busy = true;
+    var url = _q.shift();
+    window.location.href = url;
+    setTimeout(function() { _busy = false; _pump(); }, 30);
+  }
+  window.__kickcraft__._nav = function(url) { _q.push(url); _pump(); };
+
   window.__kickcraft__.sendParam = function(id, value) {
     try {
-      var f = document.getElementById('__juce_bridge__');
-      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-      f.src = 'juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value));
+      window.__kickcraft__._nav(
+        'juce://param?id=' + encodeURIComponent(id) +
+        '&value='          + encodeURIComponent(String(value)));
     } catch(e) {}
   };
 
@@ -38,11 +53,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
   window.__kickcraft__.exportKick = function() {
-    try {
-      var f = document.getElementById('__juce_bridge__');
-      if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-      f.src = 'juce://export';
-    } catch(e) {}
+    try { window.__kickcraft__._nav('juce://export'); } catch(e) {}
   };
 
   // Restore a previously loaded kick from base64 (called after minimize/reopen)
