@@ -88,10 +88,14 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     } catch(e) {}
   };
 
-  // Apply param values passed from C++ on editor open
+  // Apply param values from C++ on editor open — retry until page JS is ready
   (function() {
     function applyInitParams() {
       try {
+        if (typeof kv === 'undefined' || typeof KNOBS === 'undefined') {
+          setTimeout(applyInitParams, 150);
+          return;
+        }
         var p = window.__JUCE__.initialisationData.params;
         if (!p) return;
         var ids = Object.keys(p);
@@ -99,10 +103,10 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
           window.__kickcraft__.receiveParam(ids[i], p[ids[i]]);
         }
       } catch(e) {
-        setTimeout(applyInitParams, 200);
+        setTimeout(applyInitParams, 150);
       }
     }
-    setTimeout(applyInitParams, 400);
+    setTimeout(applyInitParams, 300);
   })();
 
 })();
