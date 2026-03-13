@@ -17,25 +17,8 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 (function() {
   if (!window.__kickcraft__) window.__kickcraft__ = {};
 
-  // ── Navigation queue ─────────────────────────────────────────────────────────
-  // WebView2 (Windows) only fires pageAboutToLoad for TOP-LEVEL navigations.
-  // iframe.src = 'juce://...' is silently ignored on Windows.
-  // window.location.href works — pageAboutToLoad returns false to cancel it.
-  // Queue serialises rapid calls so they don't collide.
-  var _q = [], _busy = false;
-  function _pump() {
-    if (_busy || _q.length === 0) return;
-    _busy = true;
-    var url = _q.shift();
-    window.location.href = url;
-    setTimeout(function() { _busy = false; _pump(); }, 30);
-  }
-  window.__kickcraft__._nav = function(url) { _q.push(url); _pump(); };
-
   window.__kickcraft__.sendParam = function(id, value) {
-    try {
-      window.__JUCE__.backend.emitEvent('sendParam', {id: id, value: value});
-    } catch(e) {}
+    window.__JUCE__.backend.emitEvent('sendParam', {id: id, value: value});
   };
 
   window.__kickcraft__.receiveParam = function(id, value) {
@@ -51,9 +34,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
   window.__kickcraft__.exportKick = function() {
-    try {
-      window.__JUCE__.backend.emitEvent('exportkick', {});
-    } catch(e) {}
+    window.__JUCE__.backend.emitEvent('exportkick', {});
   };
 
   // Restore a previously loaded kick from base64 (called after minimize/reopen)
@@ -81,33 +62,9 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     }
   };
 
-  // Send loaded kick as base64 to C++ for persistent storage
   window.__kickcraft__._sendKickB64 = function(b64) {
-    try {
-      window.__JUCE__.backend.emitEvent('savekick', {b64: b64});
-    } catch(e) {}
+    window.__JUCE__.backend.emitEvent('savekick', {b64: b64});
   };
-
-  // Apply param values from C++ on editor open — retry until page JS is ready
-  (function() {
-    function applyInitParams() {
-      try {
-        if (typeof kv === 'undefined' || typeof KNOBS === 'undefined') {
-          setTimeout(applyInitParams, 150);
-          return;
-        }
-        var p = window.__JUCE__.initialisationData.params;
-        if (!p) return;
-        var ids = Object.keys(p);
-        for (var i = 0; i < ids.length; i++) {
-          window.__kickcraft__.receiveParam(ids[i], p[ids[i]]);
-        }
-      } catch(e) {
-        setTimeout(applyInitParams, 150);
-      }
-    }
-    setTimeout(applyInitParams, 300);
-  })();
 
 })();
 </script>
@@ -145,10 +102,8 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    juce::File tmp = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                         .getChildFile("kickcraft_ui.html");
-    tmp.replaceWithText (html);
-    webView.goToURL ("file://" + tmp.getFullPathName());
+    pendingHtml = html;
+    webView.goToURL ("https://kickcraft.localhost/");
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
