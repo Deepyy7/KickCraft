@@ -24,8 +24,7 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                     const auto* end   = begin + std::strlen (utf8.getAddress());
                     return juce::WebBrowserComponent::Resource {
                         std::vector<std::byte> (begin, end), "text/html" };
-                },
-                )
+                })
             .withEventListener (juce::Identifier ("sendParam"),
                 [p = &o](const juce::var& data) {
                     auto id  = data["id"].toString();
