@@ -44,7 +44,7 @@ private:
                             }
                             return std::nullopt;
                         },
-                        juce::URL ("https://kickcraft.localhost"))
+                        juce::String ("https://kickcraft.localhost"))
                     .withEventListener (juce::Identifier ("sendParam"),
                         [p = &o](const juce::var& data) {
                             auto id  = data["id"].toString();
