@@ -14,7 +14,6 @@ KickCraftProcessor::createParameterLayout()
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("tight", "TIGHT",  0.0f, 1.0f,   0.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("sat",   "SAT",    0.0f, 1.0f,   0.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("clip",  "CLIP",   0.0f, 1.0f,   0.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> ("mix",   "MIX",    0.0f, 1.0f,   1.0f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> ("out",   "OUTPUT",-12.0f,12.0f,  0.0f));
     return { params.begin(), params.end() };
 }
@@ -45,7 +44,6 @@ void KickCraftProcessor::prepareToPlay (double sr, int samplesPerBlock)
     tightSmooth.reset(sr,r); tightSmooth.setCurrentAndTargetValue(0.f);
     satSmooth.reset(sr,r);   satSmooth.setCurrentAndTargetValue(0.f);
     clipSmooth.reset(sr,r);  clipSmooth.setCurrentAndTargetValue(0.f);
-    mixSmooth.reset(sr,r);   mixSmooth.setCurrentAndTargetValue(1.f);
     outSmooth.reset(sr,r);   outSmooth.setCurrentAndTargetValue(0.f);
     transSmooth.reset(sr,r); transSmooth.setCurrentAndTargetValue(0.f);
 
@@ -106,7 +104,6 @@ void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     tightSmooth.setTargetValue(apvts.getRawParameterValue("tight")->load());
     satSmooth  .setTargetValue(apvts.getRawParameterValue("sat")  ->load());
     clipSmooth .setTargetValue(apvts.getRawParameterValue("clip") ->load());
-    mixSmooth  .setTargetValue(apvts.getRawParameterValue("mix")  ->load());
     outSmooth  .setTargetValue(apvts.getRawParameterValue("out")  ->load());
 
     updateFilters(); updateCompressor();
@@ -121,9 +118,6 @@ void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         prevTransKv = transKv;
     }
 
-    dryBuf.setSize(CH, N, false, false, true);
-    for (int ch=0; ch<CH; ++ch) dryBuf.copyFrom(ch,0,buffer,ch,0,N);
-
     for (int s=0; s<N; ++s) {
         if (transDecay>0.f && transEnv>1.001f) transEnv*=transDecay; else transEnv=1.f;
 
@@ -132,7 +126,7 @@ void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         float clip  = clipSmooth.getNextValue();
         subSmooth.getNextValue(); punchSmooth.getNextValue(); bodySmooth.getNextValue();
         airSmooth.getNextValue(); tightSmooth.getNextValue();
-        mixSmooth.getNextValue(); outSmooth.getNextValue();
+        outSmooth.getNextValue();
 
         for (int ch=0; ch<CH; ++ch) {
             float x = buffer.getSample(ch,s) * transEnv;
@@ -151,13 +145,11 @@ void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     { juce::dsp::AudioBlock<float> blk(buffer); compressor.process(juce::dsp::ProcessContextReplacing<float>(blk)); }
 
-    float mix = mixSmooth.getCurrentValue();
-    float og  = juce::Decibels::decibelsToGain(outSmooth.getCurrentValue());
+    float og = juce::Decibels::decibelsToGain(outSmooth.getCurrentValue());
     for (int ch=0; ch<CH; ++ch) {
         auto* w = buffer.getWritePointer(ch);
-        auto* d = dryBuf.getReadPointer(ch);
         for (int s=0; s<N; ++s) {
-            w[s] = (w[s]*mix + d[s]*(1.f-mix)) * og;
+            w[s] *= og;
             if (!std::isfinite(w[s])) w[s]=0.f;
         }
     }
