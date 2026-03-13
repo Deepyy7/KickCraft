@@ -17,6 +17,7 @@ private:
     void syncAllParamsToUI();
 
     KickCraftProcessor& processor;
+    juce::String processedHtml;   // built in ctor body, served via resourceProvider
 
     struct KickWebView : public juce::WebBrowserComponent
     {
@@ -31,6 +32,20 @@ private:
                                 .getChildFile ("KickCraft")))
                     .withKeepPageLoadedWhenBrowserIsHidden()
                     .withNativeIntegrationEnabled()
+                    .withResourceProvider (
+                        [&o](const juce::String& url) -> std::optional<juce::WebBrowserComponent::Resource>
+                        {
+                            if (url == "/" || url == "/index.html")
+                            {
+                                auto utf8 = o.processedHtml.toUTF8();
+                                const auto* begin = reinterpret_cast<const std::byte*> (utf8.getAddress());
+                                const auto* end   = begin + std::strlen (utf8.getAddress());
+                                return juce::WebBrowserComponent::Resource {
+                                    std::vector<std::byte> (begin, end), "text/html" };
+                            }
+                            return std::nullopt;
+                        },
+                        juce::URL ("https://kickcraft.local"))
                     .withEventListener (juce::Identifier ("sendParam"),
                         [p = &o](const juce::var& data) {
                             auto id  = data["id"].toString();
