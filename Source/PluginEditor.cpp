@@ -118,13 +118,10 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    juce::File tmp = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                         .getChildFile ("KickCraft/kickcraft_ui.html");
-    tmp.getParentDirectory().createDirectory();
-    tmp.replaceWithText (html);
-    webView.goToURL ("file:///" + tmp.getFullPathName().replaceCharacter ('\\', '/'));
+    processedHtml = html;
+    webView.goToURL ("https://kickcraft.local/index.html");
 
-    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
+    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
 
     paramsNeedSync = false;
@@ -134,7 +131,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 KickCraftEditor::~KickCraftEditor()
 {
     stopTimer();
-    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
+    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.removeParameterListener(ids[i], this);
 }
 
@@ -260,7 +257,7 @@ void KickCraftEditor::parameterChanged (const juce::String&, float)
 
 void KickCraftEditor::syncAllParamsToUI()
 {
-    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
+    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i)
     {
         float v = processor.apvts.getRawParameterValue(ids[i])->load();
@@ -353,5 +350,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith ("file://") || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith ("https://kickcraft.local") || url.startsWith ("data:") || url.startsWith ("blob:");
 }
