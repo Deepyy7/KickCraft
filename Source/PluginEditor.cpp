@@ -24,14 +24,9 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   }
   window.__kickcraft__._nav = _juceNav;
 
-  function _emit(name, data) {
-    try { window.__JUCE__.backend.emitEvent(name, data); return; } catch(e) {}
-    var q = Object.keys(data).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(String(data[k])); }).join('&');
-    _juceNav('juce://' + name + (q ? '?' + q : ''));
-  }
-
   window.__kickcraft__.sendParam = function(id, value) {
-    _emit('sendParam', {id: id, value: value});
+    try { window.__JUCE__.backend.emitEvent('sendParam', {id: id, value: value}); return; } catch(e) {}
+    _juceNav('juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value)));
   };
 
   window.__kickcraft__.receiveParam = function(id, value) {
@@ -47,7 +42,8 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
   window.__kickcraft__.exportKick = function() {
-    _emit('exportkick', {});
+    try { window.__JUCE__.backend.emitEvent('exportkick', {}); return; } catch(e) {}
+    _juceNav('juce://export');
   };
 
   // Restore a previously loaded kick from base64 (called after minimize/reopen)
