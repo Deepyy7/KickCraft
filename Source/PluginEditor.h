@@ -31,20 +31,6 @@ private:
                                 .getChildFile ("KickCraft")))
                     .withKeepPageLoadedWhenBrowserIsHidden()
                     .withNativeIntegrationEnabled()
-                    .withResourceProvider (
-                        [&o](const juce::String& url) -> std::optional<juce::WebBrowserComponent::Resource>
-                        {
-                            if (url == "/" && o.pendingHtml.isNotEmpty())
-                            {
-                                const auto* d = reinterpret_cast<const std::byte*> (o.pendingHtml.toRawUTF8());
-                                return juce::WebBrowserComponent::Resource {
-                                    std::vector<std::byte> (d, d + o.pendingHtml.getNumBytesAsUTF8()),
-                                    "text/html"
-                                };
-                            }
-                            return std::nullopt;
-                        },
-                        juce::String ("https://kickcraft.localhost"))
                     .withEventListener (juce::Identifier ("sendParam"),
                         [p = &o](const juce::var& data) {
                             auto id  = data["id"].toString();
@@ -77,7 +63,6 @@ private:
     bool firstCallDone { false };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
-    juce::String      pendingHtml;
     juce::String      wavB64Accumulator;
     int               chunksTotal    { 0 };
     int               chunksReceived { 0 };
