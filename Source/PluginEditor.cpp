@@ -25,7 +25,7 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                     return juce::WebBrowserComponent::Resource {
                         std::vector<std::byte> (begin, end), "text/html" };
                 },
-                juce::String ("https://kickcraft.local"))
+                )
             .withEventListener (juce::Identifier ("sendParam"),
                 [p = &o](const juce::var& data) {
                     auto id  = data["id"].toString();
@@ -168,7 +168,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     );
 
     processedHtml = html;
-    webView.goToURL ("https://kickcraft.local/");
+    webView.goToURL (webView.getResourceProviderRoot());
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
@@ -399,5 +399,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith ("https://kickcraft.local") || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith (webView.getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
 }
