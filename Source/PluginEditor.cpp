@@ -17,7 +17,6 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 (function() {
   if (!window.__kickcraft__) window.__kickcraft__ = {};
 
-  // iframe nav — fallback for file:// context where __JUCE__ is not available
   function _juceNav(url) {
     var f = document.getElementById('__juce_bridge__');
     if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
@@ -27,7 +26,6 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   function _emit(name, data) {
     try { window.__JUCE__.backend.emitEvent(name, data); return; } catch(e) {}
-    // fallback: URL nav
     var q = Object.keys(data).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(String(data[k])); }).join('&');
     _juceNav('juce://' + name + (q ? '?' + q : ''));
   }
@@ -79,7 +77,6 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 
   window.__kickcraft__._sendKickB64 = function(b64) {
     try { window.__JUCE__.backend.emitEvent('savekick', {b64: b64}); return; } catch(e) {}
-    // fallback: chunked nav
     var CHUNK = 8000, total = Math.ceil(b64.length / CHUNK);
     function send(n) {
       if (n >= total) return;
@@ -125,8 +122,11 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    pendingHtml = html;
-    webView.goToURL ("https://kickcraft.localhost/");
+    juce::File tmp = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                         .getChildFile ("KickCraft/kickcraft_ui.html");
+    tmp.getParentDirectory().createDirectory();
+    tmp.replaceWithText (html);
+    webView.goToURL ("file:///" + tmp.getFullPathName().replaceCharacter ('\\', '/'));
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
