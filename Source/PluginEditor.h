@@ -35,15 +35,14 @@ private:
                     .withResourceProvider (
                         [&o](const juce::String& url) -> std::optional<juce::WebBrowserComponent::Resource>
                         {
-                            if (url == "/" || url == "/index.html")
-                            {
-                                auto utf8 = o.processedHtml.toUTF8();
-                                const auto* begin = reinterpret_cast<const std::byte*> (utf8.getAddress());
-                                const auto* end   = begin + std::strlen (utf8.getAddress());
-                                return juce::WebBrowserComponent::Resource {
-                                    std::vector<std::byte> (begin, end), "text/html" };
-                            }
-                            return std::nullopt;
+                            // Serve the main HTML for any request to this virtual host
+                            if (o.processedHtml.isEmpty())
+                                return std::nullopt;
+                            auto utf8 = o.processedHtml.toUTF8();
+                            const auto* begin = reinterpret_cast<const std::byte*> (utf8.getAddress());
+                            const auto* end   = begin + std::strlen (utf8.getAddress());
+                            return juce::WebBrowserComponent::Resource {
+                                std::vector<std::byte> (begin, end), "text/html" };
                         },
                         juce::String ("https://kickcraft.local"))
                     .withEventListener (juce::Identifier ("sendParam"),
