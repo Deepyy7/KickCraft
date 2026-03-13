@@ -31,13 +31,20 @@ private:
                                 .getChildFile ("KickCraft")))
                     .withKeepPageLoadedWhenBrowserIsHidden()
                     .withNativeIntegrationEnabled()
-                    .withInitialisationData (juce::Identifier ("params"), [&o]() -> juce::var {
-                        juce::DynamicObject::Ptr obj = new juce::DynamicObject();
-                        static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
-                        for (int i = 0; ids[i]; ++i)
-                            obj->setProperty (ids[i], (double) o.processor.apvts.getRawParameterValue (ids[i])->load());
-                        return juce::var (obj.get());
-                    }())
+                    .withResourceProvider (
+                        [&o](const juce::String& url) -> std::optional<juce::WebBrowserComponent::Resource>
+                        {
+                            if (url == "/" && o.pendingHtml.isNotEmpty())
+                            {
+                                const auto* d = reinterpret_cast<const std::byte*> (o.pendingHtml.toRawUTF8());
+                                return juce::WebBrowserComponent::Resource {
+                                    std::vector<std::byte> (d, d + o.pendingHtml.getNumBytesAsUTF8()),
+                                    "text/html"
+                                };
+                            }
+                            return std::nullopt;
+                        },
+                        juce::URL ("https://kickcraft.localhost"))
                     .withEventListener (juce::Identifier ("sendParam"),
                         [p = &o](const juce::var& data) {
                             auto id  = data["id"].toString();
@@ -70,6 +77,7 @@ private:
     bool firstCallDone { false };
     std::unique_ptr<juce::FileChooser> fileChooser;
 
+    juce::String      pendingHtml;
     juce::String      wavB64Accumulator;
     int               chunksTotal    { 0 };
     int               chunksReceived { 0 };
