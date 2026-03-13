@@ -102,8 +102,11 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    pendingHtml = html;
-    webView.goToURL ("https://kickcraft.localhost/");
+    juce::File tmp = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                         .getChildFile ("KickCraft/kickcraft_ui.html");
+    tmp.getParentDirectory().createDirectory();
+    tmp.replaceWithText (html);
+    webView.goToURL ("file:///" + tmp.getFullPathName().replaceCharacter ('\\', '/'));
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","mix","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
