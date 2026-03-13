@@ -119,7 +119,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     );
 
     processedHtml = html;
-    webView.goToURL ("https://kickcraft.local/index.html");
+    webView.goToURL ("https://kickcraft.local/");
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
