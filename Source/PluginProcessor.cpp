@@ -1,354 +1,230 @@
+#include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include <BinaryData.h>
 
-KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
-    : AudioProcessorEditor (p), processor (p), webView (*this)
+juce::AudioProcessorValueTreeState::ParameterLayout
+KickCraftProcessor::createParameterLayout()
 {
-    setSize (1060, 660);
-    setResizable (true, true);
-    setResizeLimits (800, 500, 1400, 900);
-    addAndMakeVisible (webView);
-
-    juce::String html (BinaryData::ui_html, BinaryData::ui_htmlSize);
-
-    // JS bridge injection
-    juce::String bridge = R"BRIDGE(
-<script>
-(function() {
-  if (!window.__kickcraft__) window.__kickcraft__ = {};
-
-  function _juceNav(url) {
-    var f = document.getElementById('__juce_bridge__');
-    if (!f) { f = document.createElement('iframe'); f.id='__juce_bridge__'; f.style.display='none'; document.body.appendChild(f); }
-    f.src = url;
-  }
-  window.__kickcraft__._nav = _juceNav;
-
-  window.__kickcraft__.sendParam = function(id, value) {
-    try { window.__JUCE__.backend.emitEvent('sendParam', {id: id, value: value}); return; } catch(e) {}
-    _juceNav('juce://param?id=' + encodeURIComponent(id) + '&value=' + encodeURIComponent(String(value)));
-  };
-
-  window.__kickcraft__.receiveParam = function(id, value) {
-    if (typeof kv === 'undefined') return;
-    kv[id] = value;
-    var k = KNOBS.find(function(kk){return kk.id===id;});
-    if (k && kCvs[id]) {
-      renderKnob(kCvs[id], k.sz, value, k);
-      applyDSP(); drawWaveform();
-      var tv = document.getElementById('tipval-' + id);
-      if (tv) tv.textContent = id==='out'?(value>=0?'+':'')+parseFloat(value).toFixed(1)+' dB':Math.round(value*100)+'%';
-    }
-  };
-
-  window.__kickcraft__.exportKick = function() {
-    try { window.__JUCE__.backend.emitEvent('exportkick', {}); return; } catch(e) {}
-    _juceNav('juce://export');
-  };
-
-  // Restore a previously loaded kick from base64 (called after minimize/reopen)
-  window.__kickcraft__.restoreKickFromB64 = function(b64) {
-    if (!b64) return;
-    initAudio();
-    if (actx.state === 'suspended') actx.resume();
-    try {
-      var bin = atob(b64), len = bin.length;
-      var ab = new ArrayBuffer(len), v = new Uint8Array(ab);
-      for (var i = 0; i < len; i++) v[i] = bin.charCodeAt(i);
-      actx.decodeAudioData(ab, function(buf) {
-        audioBuf = buf; extractWave(buf); drawWaveform();
-      });
-    } catch(e) {}
-  };
-
-  // Receive restore chunks from C++ — chunked to stay under WKWebView JS size limit
-  window.__kickcraft__._receiveRestoreChunk = function(n, total, data) {
-    if (n === 0) window.__kickcraft__._restoreBuf = '';
-    window.__kickcraft__._restoreBuf += data;
-    if (n === total - 1) {
-      window.__kickcraft__.restoreKickFromB64(window.__kickcraft__._restoreBuf);
-      window.__kickcraft__._restoreBuf = '';
-    }
-  };
-
-  window.__kickcraft__._sendKickB64 = function(b64) {
-    try { window.__JUCE__.backend.emitEvent('savekick', {b64: b64}); return; } catch(e) {}
-    var CHUNK = 8000, total = Math.ceil(b64.length / CHUNK);
-    function send(n) {
-      if (n >= total) return;
-      _juceNav('juce://savekick?n=' + n + '&total=' + total + '&data=' + encodeURIComponent(b64.slice(n*CHUNK,(n+1)*CHUNK)));
-      setTimeout(function(){ send(n+1); }, 30);
-    }
-    send(0);
-  };
-
-})();
-</script>
-)BRIDGE";
-
-    html = html.replace ("</body>", bridge + "\n</body>");
-
-    // Patch knob mouseup — send param to C++
-    html = html.replace (
-        "window.removeEventListener('mouseup',   onUp);\n          pushUndo();",
-        "window.removeEventListener('mouseup',   onUp);\n          pushUndo();\n          if(window.__kickcraft__)window.__kickcraft__.sendParam(k_.id,kv[k_.id]);"
-    );
-    // Patch double-click reset
-    html = html.replace (
-        "pushUndo(); kv[k_.id] = k_.def; renderKnob(cvs_, sz_, k_.def, k_); applyDSP(); drawWaveform();",
-        "pushUndo(); kv[k_.id]=k_.def; renderKnob(cvs_,sz_,k_.def,k_); applyDSP(); drawWaveform(); if(window.__kickcraft__)window.__kickcraft__.sendParam(k_.id,k_.def);"
-    );
-    // Patch preset load
-    html = html.replace (
-        "var id; for (id in p.v) { kv[id] = p.v[id]; if (window.__kickcraft__) window.__kickcraft__.sendParam(id, p.v[id]); }",
-        "var id; for(id in p.v){kv[id]=p.v[id]; if(window.__kickcraft__)window.__kickcraft__.sendParam(id,p.v[id]);}"
-    );
-    // Patch loadFileObj — after decoding audio, also send base64 to C++ for restore
-    html = html.replace (
-        "  reader.readAsArrayBuffer(file);\n}",
-        "  reader.readAsArrayBuffer(file);\n"
-        "  if (window.__kickcraft__ && window.__kickcraft__._sendKickB64) {\n"
-        "    var r2 = new FileReader();\n"
-        "    r2.onload = function(e2) {\n"
-        "      var b64 = e2.target.result.split(',')[1];\n"
-        "      window.__kickcraft__._sendKickB64(b64);\n"
-        "    };\n"
-        "    r2.readAsDataURL(file);\n"
-        "  }\n"
-        "}"
-    );
-
-    processedHtml = html;
-    webView.goToURL ("https://kickcraft.local/");
-
-    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
-    for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
-
-    paramsNeedSync = false;
-    startTimer (800);
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("sub",   "SUB",    0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("trans", "TRANS",  0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("punch", "PUNCH",  0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("body",  "BODY",   0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("click", "CLICK",  0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("air",   "AIR",    0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("tight", "TIGHT",  0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("sat",   "SAT",    0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("clip",  "CLIP",   0.0f, 1.0f,   0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> ("out",   "OUTPUT",-12.0f,12.0f,  0.0f));
+    return { params.begin(), params.end() };
 }
 
-KickCraftEditor::~KickCraftEditor()
+KickCraftProcessor::KickCraftProcessor()
+    : AudioProcessor (BusesProperties()
+                      .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
+                      .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+      apvts (*this, nullptr, "KickCraftState", createParameterLayout())
+{}
+
+KickCraftProcessor::~KickCraftProcessor() {}
+
+void KickCraftProcessor::prepareToPlay (double sr, int samplesPerBlock)
 {
-    stopTimer();
-    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
-    for (int i=0; ids[i]; ++i) processor.apvts.removeParameterListener(ids[i], this);
+    sampleRate = sr;
+    juce::dsp::ProcessSpec spec { sr, (juce::uint32)samplesPerBlock, 2 };
+    compressor.prepare (spec);
+    compressor.setAttack (10.0f); compressor.setRelease (200.0f);
+    compressor.setThreshold (-18.0f); compressor.setRatio (2.0f);
+
+    float r = 0.02f;
+    subSmooth.reset(sr,r);   subSmooth.setCurrentAndTargetValue(0.f);
+    punchSmooth.reset(sr,r); punchSmooth.setCurrentAndTargetValue(0.f);
+    bodySmooth.reset(sr,r);  bodySmooth.setCurrentAndTargetValue(0.f);
+    clickSmooth.reset(sr,r); clickSmooth.setCurrentAndTargetValue(0.f);
+    airSmooth.reset(sr,r);   airSmooth.setCurrentAndTargetValue(0.f);
+    tightSmooth.reset(sr,r); tightSmooth.setCurrentAndTargetValue(0.f);
+    satSmooth.reset(sr,r);   satSmooth.setCurrentAndTargetValue(0.f);
+    clipSmooth.reset(sr,r);  clipSmooth.setCurrentAndTargetValue(0.f);
+    outSmooth.reset(sr,r);   outSmooth.setCurrentAndTargetValue(0.f);
+    transSmooth.reset(sr,r); transSmooth.setCurrentAndTargetValue(0.f);
+
+    transEnv=1.f; transDecay=0.f; prevTransKv=-1.f;
+    dryBuf.setSize(2, samplesPerBlock);
+
+    // Allocate / reset capture ring buffer
+    const int capLen = (int)(sr * kCaptureSecs);
+    captureBufLen.store   (capLen, std::memory_order_relaxed);
+    captureBuffer.setSize (2, capLen, false, true, false);
+    captureWritePos.store (0, std::memory_order_relaxed);
+    captureFilled.store   (0, std::memory_order_relaxed);
+
+    updateFilters();
 }
 
-void KickCraftEditor::resized()
+void KickCraftProcessor::releaseResources() {}
+
+void KickCraftProcessor::updateFilters()
 {
-    webView.setBounds (getLocalBounds());
+    float sr    = (float)sampleRate.load();
+    float sub   = apvts.getRawParameterValue("sub")  ->load();
+    float punch = apvts.getRawParameterValue("punch")->load();
+    float body  = apvts.getRawParameterValue("body") ->load();
+    float air   = apvts.getRawParameterValue("air")  ->load();
+
+    auto sc = Coeffs::makeLowShelf  (sr, 50.f,    0.707f, juce::Decibels::decibelsToGain(sub*12.f));
+    auto pc = Coeffs::makePeakFilter(sr, 140.f,   1.5f,   juce::Decibels::decibelsToGain(punch*10.f));
+    auto bc = Coeffs::makePeakFilter(sr, 280.f,   1.2f,   juce::Decibels::decibelsToGain(body*8.f));
+    auto cc = Coeffs::makeBandPass  (sr, 5500.f,  1.8f);
+    auto ac = Coeffs::makeHighShelf (sr, 10000.f, 0.707f, juce::Decibels::decibelsToGain(air*12.f));
+
+    *subL.coefficients=*sc;   *subR.coefficients=*sc;
+    *punchL.coefficients=*pc; *punchR.coefficients=*pc;
+    *bodyL.coefficients=*bc;  *bodyR.coefficients=*bc;
+    *clickBpL.coefficients=*cc; *clickBpR.coefficients=*cc;
+    *airL.coefficients=*ac;   *airR.coefficients=*ac;
 }
 
-void KickCraftEditor::timerCallback()
+void KickCraftProcessor::updateCompressor()
 {
-    if (! firstCallDone)
+    float tight = apvts.getRawParameterValue("tight")->load();
+    compressor.setRatio  (1.f + tight * 7.f);
+    compressor.setRelease(400.f - tight * 360.f);
+}
+
+void KickCraftProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
+    juce::ScopedNoDenormals noDenormals;
+    const int N  = buffer.getNumSamples();
+    const int CH = juce::jmin(buffer.getNumChannels(), 2);
+
+    subSmooth  .setTargetValue(apvts.getRawParameterValue("sub")  ->load());
+    punchSmooth.setTargetValue(apvts.getRawParameterValue("punch")->load());
+    bodySmooth .setTargetValue(apvts.getRawParameterValue("body") ->load());
+    clickSmooth.setTargetValue(apvts.getRawParameterValue("click")->load());
+    airSmooth  .setTargetValue(apvts.getRawParameterValue("air")  ->load());
+    tightSmooth.setTargetValue(apvts.getRawParameterValue("tight")->load());
+    satSmooth  .setTargetValue(apvts.getRawParameterValue("sat")  ->load());
+    clipSmooth .setTargetValue(apvts.getRawParameterValue("clip") ->load());
+    outSmooth  .setTargetValue(apvts.getRawParameterValue("out")  ->load());
+
+    updateFilters(); updateCompressor();
+
+    float transKv = apvts.getRawParameterValue("trans")->load();
+    if (transKv != prevTransKv) {
+        if (transKv > 0.005f) {
+            float ms = 1.f + (1.f-transKv)*4.f;
+            transEnv   = 1.f + transKv*5.f;
+            transDecay = std::exp(-1.f/((float)sampleRate.load()*ms*0.001f));
+        } else { transEnv=1.f; transDecay=0.f; }
+        prevTransKv = transKv;
+    }
+
+    for (int s=0; s<N; ++s) {
+        if (transDecay>0.f && transEnv>1.001f) transEnv*=transDecay; else transEnv=1.f;
+
+        float click = clickSmooth.getNextValue();
+        float sat   = satSmooth.getNextValue();
+        float clip  = clipSmooth.getNextValue();
+        subSmooth.getNextValue(); punchSmooth.getNextValue(); bodySmooth.getNextValue();
+        airSmooth.getNextValue(); tightSmooth.getNextValue();
+        outSmooth.getNextValue();
+
+        for (int ch=0; ch<CH; ++ch) {
+            float x = buffer.getSample(ch,s) * transEnv;
+            x = ch==0 ? subL.processSample(x)    : subR.processSample(x);
+            x = ch==0 ? punchL.processSample(x)  : punchR.processSample(x);
+            x = ch==0 ? bodyL.processSample(x)   : bodyR.processSample(x);
+            float cb = ch==0 ? clickBpL.processSample(x) : clickBpR.processSample(x);
+            x += cb * click * 6.f;
+            x = ch==0 ? airL.processSample(x) : airR.processSample(x);
+            if (sat>0.001f) { float d=1.f+sat*3.f; x=softClip(x*d)/softClip(d); }
+            if (clip>0.001f) { float t=1.f-clip*0.5f; x=softClipHard(x/t)*t; }
+            if (!std::isfinite(x)) x=0.f;
+            buffer.setSample(ch,s,x);
+        }
+    }
+
+    { juce::dsp::AudioBlock<float> blk(buffer); compressor.process(juce::dsp::ProcessContextReplacing<float>(blk)); }
+
+    float og = juce::Decibels::decibelsToGain(outSmooth.getCurrentValue());
+    for (int ch=0; ch<CH; ++ch) {
+        auto* w = buffer.getWritePointer(ch);
+        for (int s=0; s<N; ++s) {
+            w[s] *= og;
+            if (!std::isfinite(w[s])) w[s]=0.f;
+        }
+    }
+
+    // ── Capture processed output into ring buffer ─────────────────────────────
+    // Block-wise copy: at most 2 modulo ops per block instead of N.
+    // CH==1 (mono): mirror L→R so the exported WAV always has both channels.
     {
-        firstCallDone = true;
-        if (auto* peer = getPeer())
-            peer->setFullScreen (false);
-        syncAllParamsToUI();
-        webView.evaluateJavascript ("if(typeof resizeDisplays==='function'){resizeDisplays();buildKnobs();}");
-        startTimerHz (30);
-        return;
-    }
-
-    if (paramsNeedSync.exchange (false)) syncAllParamsToUI();
-
-    // Send one restore chunk per tick — safe size for WKWebView evaluateJavascript
-    if (kickRestoreIdx >= 0 && kickRestoreIdx < kickRestoreChunks.size())
-    {
-        int n     = kickRestoreIdx;
-        int total = kickRestoreChunks.size();
-        juce::String js =
-            "if(window.__kickcraft__&&window.__kickcraft__._receiveRestoreChunk)"
-            "window.__kickcraft__._receiveRestoreChunk("
-            + juce::String(n) + "," + juce::String(total) + ",'"
-            + kickRestoreChunks[n] + "');";
-        webView.evaluateJavascript (js);
-        kickRestoreIdx++;
-        if (kickRestoreIdx >= total)
+        const int bufLen = captureBufLen.load (std::memory_order_relaxed);
+        if (bufLen > 0)
         {
-            kickRestoreIdx  = -1;
-            kickRestoreDone = true;
-            kickRestoreChunks.clear();
-        }
-    }
+            int pos      = captureWritePos.load (std::memory_order_relaxed);
+            int filled   = captureFilled.load   (std::memory_order_relaxed);
+            int rem      = N;
+            int srcOff   = 0;
 
-    // Export error alert
-    if (processor.exportFailed.exchange (false))
-    {
-        juce::AlertWindow::showMessageBoxAsync (
-            juce::AlertWindow::WarningIcon,
-            "KickCraft",
-            "Export failed — check disk space and write permissions.",
-            "OK");
-    }
-
-    // All WAV export chunks received — decode and write to disk
-    if (allChunksReady.exchange (false))
-    {
-        juce::MemoryOutputStream decoded;
-        if (! juce::Base64::convertFromBase64 (decoded, wavB64Accumulator))
-        {
-            juce::AlertWindow::showMessageBoxAsync (
-                juce::AlertWindow::WarningIcon, "KickCraft",
-                "Export failed — base64 decode error.", "OK");
-            wavB64Accumulator = juce::String();
-            return;
-        }
-        juce::MemoryBlock wavData (decoded.getData(), decoded.getDataSize());
-        wavB64Accumulator = juce::String();
-
-        fileChooser = std::make_unique<juce::FileChooser> (
-            "Save Kick as WAV",
-            juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
-                .getChildFile ("KickCraft.wav"),
-            "*.wav");
-
-        juce::Component::SafePointer<KickCraftEditor> safeThis (this);
-        fileChooser->launchAsync (
-            juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
-            [safeThis, wavData](const juce::FileChooser& fc)
+            while (rem > 0)
             {
-                if (safeThis == nullptr) return;
-                auto result = fc.getResult();
-                if (result != juce::File{})
-                    if (! result.replaceWithData (wavData.getData(), wavData.getSize()))
-                        juce::AlertWindow::showMessageBoxAsync (
-                            juce::AlertWindow::WarningIcon, "KickCraft",
-                            "Export failed — could not write file.", "OK");
-            });
-    }
+                const int chunk = juce::jmin (rem, bufLen - pos);
+                const float* src0 = buffer.getReadPointer (0) + srcOff;
+                const float* src1 = buffer.getReadPointer (CH > 1 ? 1 : 0) + srcOff;
+                juce::FloatVectorOperations::copy (captureBuffer.getWritePointer (0) + pos, src0, chunk);
+                juce::FloatVectorOperations::copy (captureBuffer.getWritePointer (1) + pos, src1, chunk);
+                pos    = (pos + chunk) % bufLen;
+                srcOff += chunk;
+                rem    -= chunk;
+            }
 
-    // All save-kick chunks received — store in processor for next editor open
-    if (saveKickReady.exchange (false))
-    {
-        processor.savedKickB64    = saveKickB64Accumulator;
-        saveKickB64Accumulator    = juce::String();
-    }
-
-    // Old-style export fallback
-    if (processor.exportRequested.exchange (false))
-    {
-        fileChooser = std::make_unique<juce::FileChooser> (
-            "Save Kick as WAV",
-            juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
-                .getChildFile ("KickCraft.wav"),
-            "*.wav");
-
-        juce::Component::SafePointer<KickCraftEditor> safeThis (this);
-        fileChooser->launchAsync (
-            juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
-            [safeThis](const juce::FileChooser& fc)
-            {
-                if (safeThis == nullptr) return;
-                auto result = fc.getResult();
-                if (result != juce::File{})
-                    safeThis->processor.renderToWav (result);
-            });
+            captureWritePos.store (pos,                              std::memory_order_relaxed);
+            captureFilled.store   (juce::jmin (filled + N, bufLen), std::memory_order_relaxed);
+        }
     }
 }
 
-void KickCraftEditor::parameterChanged (const juce::String&, float)
+void KickCraftProcessor::getStateInformation(juce::MemoryBlock& d)
+{ auto s=apvts.copyState(); std::unique_ptr<juce::XmlElement> x(s.createXml()); copyXmlToBinary(*x,d); }
+
+void KickCraftProcessor::setStateInformation(const void* d, int sz)
+{ std::unique_ptr<juce::XmlElement> x(getXmlFromBinary(d,sz)); if(x&&x->hasTagName(apvts.state.getType())) apvts.replaceState(juce::ValueTree::fromXml(*x)); }
+
+juce::AudioProcessorEditor* KickCraftProcessor::createEditor() { return new KickCraftEditor(*this); }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new KickCraftProcessor(); }
+
+// ─── Export: write captured audio to WAV ─────────────────────────────────────
+void KickCraftProcessor::renderToWav (const juce::File& outFile)
 {
-    paramsNeedSync = true;
-}
+    // Snapshot ring buffer state (message thread — audio thread may still write)
+    const int bufLen   = captureBufLen.load  (std::memory_order_relaxed);
+    const int filled   = captureFilled.load   (std::memory_order_relaxed);
+    const int writePos = captureWritePos.load  (std::memory_order_relaxed);
+    const int len      = juce::jmin (filled, bufLen);
 
-void KickCraftEditor::syncAllParamsToUI()
-{
-    static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
-    for (int i=0; ids[i]; ++i)
+    if (len == 0) { exportFailed = true; return; }   // nothing recorded yet
+
+    // Copy ring buffer → linear output buffer
+    juce::AudioBuffer<float> buf (2, len);
+    const int readStart = (writePos - len + bufLen) % bufLen;
+    for (int s = 0; s < len; ++s)
     {
-        float v = processor.apvts.getRawParameterValue(ids[i])->load();
-        juce::String js = "if(window.__kickcraft__)window.__kickcraft__.receiveParam('"
-                        + juce::String(ids[i]) + "'," + juce::String(v, 6) + ");";
-        webView.evaluateJavascript (js);
+        const int rp = (readStart + s) % bufLen;
+        buf.setSample (0, s, captureBuffer.getSample (0, rp));
+        buf.setSample (1, s, captureBuffer.getSample (1, rp));
     }
 
-    // Restore previously loaded kick — chunked to stay under WKWebView JS size limit.
-    // Guard: only start once per editor open, never re-trigger on knob changes.
-    if (processor.savedKickB64.isNotEmpty() && !kickRestoreDone && kickRestoreIdx < 0)
-    {
-        kickRestoreChunks.clear();
-        const int CHUNK = 4000;
-        const juce::String& b64 = processor.savedKickB64;
-        for (int pos = 0; pos < b64.length(); pos += CHUNK)
-            kickRestoreChunks.add (b64.substring (pos, pos + CHUNK));
-        kickRestoreIdx = 0;   // timerCallback sends one chunk per tick
-    }
-}
+    // Write 24-bit stereo WAV
+    const double srD = [this]{ double v = sampleRate.load(); return v > 0.0 ? v : 44100.0; }();
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::FileOutputStream> fos (outFile.createOutputStream());
+    if (!fos || fos->failedToOpen()) { exportFailed = true; return; }
 
-// ─── WebView URL interception ─────────────────────────────────────────────────
-bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
-{
-    if (url.startsWith ("juce://chunk"))
-    {
-        juce::String query = url.fromFirstOccurrenceOf ("?", false, false);
-        juce::StringArray pairs; pairs.addTokens (query, "&", "");
-        int n = 0, total = 0;
-        juce::String data;
-        for (auto& pair : pairs) {
-            if (pair.startsWith ("n="))     n     = pair.fromFirstOccurrenceOf ("=", false, false).getIntValue();
-            if (pair.startsWith ("total=")) total = pair.fromFirstOccurrenceOf ("=", false, false).getIntValue();
-            if (pair.startsWith ("data="))  data  = juce::URL::removeEscapeChars (pair.fromFirstOccurrenceOf ("=", false, false));
-        }
-        if (n == 0) {
-            owner.wavB64Accumulator = juce::String();
-            owner.chunksTotal       = total;
-            owner.chunksReceived    = 0;
-        }
-        owner.wavB64Accumulator += data;
-        owner.chunksReceived++;
-        if (owner.chunksReceived == owner.chunksTotal && owner.chunksTotal > 0)
-            owner.allChunksReady = true;
-        return false;
-    }
+    std::unique_ptr<juce::AudioFormatWriter> writer (
+        wav.createWriterFor (fos.get(), srD, 2, 24, {}, 0));
+    if (!writer) { exportFailed = true; return; }
 
-    // Save kick chunks — store in processor for restore after minimize/reopen
-    if (url.startsWith ("juce://savekick"))
-    {
-        juce::String query = url.fromFirstOccurrenceOf ("?", false, false);
-        juce::StringArray pairs; pairs.addTokens (query, "&", "");
-        int n = 0, total = 0;
-        juce::String data;
-        for (auto& pair : pairs) {
-            if (pair.startsWith ("n="))     n     = pair.fromFirstOccurrenceOf ("=", false, false).getIntValue();
-            if (pair.startsWith ("total=")) total = pair.fromFirstOccurrenceOf ("=", false, false).getIntValue();
-            if (pair.startsWith ("data="))  data  = juce::URL::removeEscapeChars (pair.fromFirstOccurrenceOf ("=", false, false));
-        }
-        if (n == 0) {
-            owner.saveKickB64Accumulator = juce::String();
-            owner.saveKickChunksTotal    = total;
-            owner.saveKickChunksReceived = 0;
-        }
-        owner.saveKickB64Accumulator += data;
-        owner.saveKickChunksReceived++;
-        if (owner.saveKickChunksReceived == owner.saveKickChunksTotal && owner.saveKickChunksTotal > 0)
-            owner.saveKickReady = true;
-        return false;
-    }
-
-    if (url.startsWith ("juce://export"))
-    {
-        owner.processor.exportRequested = true;
-        return false;
-    }
-
-    if (url.startsWith ("juce://param"))
-    {
-        juce::String query = url.fromFirstOccurrenceOf ("?", false, false);
-        juce::StringArray pairs; pairs.addTokens (query, "&", "");
-        juce::String paramId; float value = 0.f;
-        for (auto& pair : pairs) {
-            if (pair.startsWith ("id="))    paramId = pair.fromFirstOccurrenceOf ("=", false, false);
-            if (pair.startsWith ("value=")) value   = pair.fromFirstOccurrenceOf ("=", false, false).getFloatValue();
-        }
-        if (paramId.isNotEmpty())
-            if (auto* param = owner.processor.apvts.getParameter (paramId))
-                param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (value));
-        return false;
-    }
-
-    return url.startsWith ("https://kickcraft.local") || url.startsWith ("data:") || url.startsWith ("blob:");
+    fos.release();   // writer owns the stream
+    if (! writer->writeFromAudioSampleBuffer (buf, 0, len))
+        exportFailed = true;
 }
