@@ -53,7 +53,7 @@ private:
 
     juce::SmoothedValue<float> subSmooth, transSmooth, punchSmooth, bodySmooth;
     juce::SmoothedValue<float> clickSmooth, airSmooth, tightSmooth;
-    juce::SmoothedValue<float> satSmooth, clipSmooth, mixSmooth, outSmooth;
+    juce::SmoothedValue<float> satSmooth, clipSmooth, outSmooth;
 
     float transEnv    { 1.0f };
     float transDecay  { 0.0f };
