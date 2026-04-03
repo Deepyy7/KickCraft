@@ -15,10 +15,14 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
             .withKeepPageLoadedWhenBrowserIsHidden()
             .withNativeIntegrationEnabled()
             .withResourceProvider (
-                [&o](const juce::String&) -> std::optional<juce::WebBrowserComponent::Resource>
+                [&o](const juce::String& reqUrl) -> std::optional<juce::WebBrowserComponent::Resource>
                 {
+                    DBG("KickCraft: resource provider called, url=" + reqUrl + " htmlLen=" + juce::String(o.processedHtml.length()));
                     if (o.processedHtml.isEmpty())
+                    {
+                        DBG("KickCraft: processedHtml is EMPTY - returning nullopt");
                         return std::nullopt;
+                    }
                     auto utf8 = o.processedHtml.toUTF8();
                     const auto* begin = reinterpret_cast<const std::byte*> (utf8.getAddress());
                     const auto* end   = begin + std::strlen (utf8.getAddress());
@@ -46,7 +50,10 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                         p->processor.savedKickB64 = b64;
                     });
                 })),
-      owner (o) {}
+      owner (o)
+    {
+        DBG("KickCraft: KickWebView constructor complete");
+    }
 
 
 KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
@@ -167,7 +174,10 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     );
 
     processedHtml = html;
-    webView.goToURL (webView.getResourceProviderRoot());
+    DBG("KickCraft: processedHtml length = " + juce::String(processedHtml.length()));
+    auto root = webView.getResourceProviderRoot();
+    DBG("KickCraft: resourceProviderRoot = " + root);
+    webView.goToURL (root);
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
@@ -330,6 +340,7 @@ void KickCraftEditor::syncAllParamsToUI()
 // ─── WebView URL interception ─────────────────────────────────────────────────
 bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
 {
+    DBG("KickCraft: pageAboutToLoad url=" + url);
     if (url.startsWith ("juce://chunk"))
     {
         juce::String query = url.fromFirstOccurrenceOf ("?", false, false);
@@ -398,5 +409,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith (webView.getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith (getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
 }
