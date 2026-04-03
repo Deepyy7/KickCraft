@@ -29,6 +29,7 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                 [p = &o](const juce::var& data) {
                     auto id  = data["id"].toString();
                     auto val = static_cast<float> (static_cast<double> (data["value"]));
+                    kcLog ("sendParam RECEIVED id=" + id + " val=" + juce::String (val, 4));
                     juce::MessageManager::callAsync ([p, id, val] {
                         if (auto* param = p->processor.apvts.getParameter (id))
                             param->setValueNotifyingHost (
@@ -130,20 +131,29 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     send(0);
   };
 
+
+  // Fallback: send ALL params on any mouseup (doesn't rely on HTML patching)
+  document.addEventListener('mouseup', function() {
+    if (typeof kv === 'undefined' || !window.__kickcraft__) return;
+    var ids = ['sub','trans','punch','body','click','air','tight','sat','clip','out'];
+    ids.forEach(function(id) { if (kv[id] !== undefined) window.__kickcraft__.sendParam(id, kv[id]); });
+  });
+
+  // Test __JUCE__ availability after page load
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      try {
+        if (window.__JUCE__ && window.__JUCE__.backend) {
+          window.__JUCE__.backend.emitEvent('sendParam', {id: '__jucetest__', value: 0.0});
+        }
+      } catch(e) {}
+    }, 1500);
+  });
 })();
 </script>
 )BRIDGE";
 
     html = html.replace ("</body>", bridge + "\n</body>");
-    {
-        const char* errJs = "<script>\n"
-            "window.onerror=function(m,s,l,c,e){"
-            "document.body.style.cssText='background:#00008b;color:#fff;font-size:16px;padding:20px';"
-            "document.body.innerHTML='<h2>JS ERROR: '+m+'</h2><p>'+s+' line:'+l+'</p>';"
-            "return false;};"
-            "\n</script>\n";
-        html = html.replace ("<body", juce::String(errJs) + "<body");
-    }
 
     // Patch knob mouseup — send param to C++
     html = html.replace (
