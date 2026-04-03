@@ -135,19 +135,15 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 )BRIDGE";
 
     html = html.replace ("</body>", bridge + "\n</body>");
-    // Inject error catcher at top of <head> or after <body>
-    juce::String errCatcher = R"ERR(<script>
-window.onerror = function(msg, src, line, col, err) {
-  document.body.style.cssText = 'background:#00008b;color:#fff;font-size:18px;padding:20px;font-family:monospace;';
-  document.body.innerHTML = '<h2>JS ERROR</h2><p>' + msg + '</p><p>' + src + ' line:' + line + '</p><pre>' + (err && err.stack ? err.stack : '') + '</pre>';
-  return false;
-};
-window.addEventListener('unhandledrejection', function(e) {
-  document.body.style.cssText = 'background:#00008b;color:#fff;font-size:18px;padding:20px;font-family:monospace;';
-  document.body.innerHTML = '<h2>PROMISE ERROR</h2><p>' + e.reason + '</p>';
-});
-</script>)ERR";
-    html = html.replace ("<body", errCatcher + "\n<body");
+    {
+        const char* errJs = "<script>\n"
+            "window.onerror=function(m,s,l,c,e){"
+            "document.body.style.cssText='background:#00008b;color:#fff;font-size:16px;padding:20px';"
+            "document.body.innerHTML='<h2>JS ERROR: '+m+'</h2><p>'+s+' line:'+l+'</p>';"
+            "return false;};"
+            "\n</script>\n";
+        html = html.replace ("<body", juce::String(errJs) + "<body");
+    }
 
     // Patch knob mouseup — send param to C++
     html = html.replace (
@@ -180,7 +176,7 @@ window.addEventListener('unhandledrejection', function(e) {
     );
 
     processedHtml = html;
-    webView.goToURL (webView.getResourceProviderRoot());
+    webView.goToURL ("https://juce.backend/");
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
@@ -411,5 +407,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith (webView.getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith ("https://juce.backend") || url.startsWith ("data:") || url.startsWith ("blob:");
 }
