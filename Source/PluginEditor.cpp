@@ -45,6 +45,23 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                     juce::MessageManager::callAsync ([p, b64] {
                         p->processor.savedKickB64 = b64;
                     });
+                })
+            .withEventListener (juce::Identifier ("exportchunk"),
+                [p = &o](const juce::var& data) {
+                    int n       = static_cast<int> (data["n"]);
+                    int total   = static_cast<int> (data["total"]);
+                    auto chunk  = data["data"].toString();
+                    juce::MessageManager::callAsync ([p, n, total, chunk] {
+                        if (n == 0) {
+                            p->wavB64Accumulator = juce::String();
+                            p->chunksTotal       = total;
+                            p->chunksReceived    = 0;
+                        }
+                        p->wavB64Accumulator += chunk;
+                        p->chunksReceived++;
+                        if (p->chunksReceived == p->chunksTotal && p->chunksTotal > 0)
+                            p->allChunksReady = true;
+                    });
                 })),
       owner (o) {}
 
@@ -141,18 +158,31 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     });
   });
 
-  // 2. Hook EXPORT WAV button by ID (targeted)
+  // 2. Override _nav to route juce://chunk via emitEvent (WebView2 fix)
+  var _origNav = window.__kickcraft__._nav;
+  window.__kickcraft__._nav = function(url) {
+    if (url.indexOf('juce://chunk') === 0) {
+      var qs = url.slice(url.indexOf('?') + 1);
+      var params = {};
+      qs.split('&').forEach(function(p) {
+        var eq = p.indexOf('=');
+        if (eq > 0) params[p.slice(0, eq)] = decodeURIComponent(p.slice(eq + 1));
+      });
+      try {
+        window.__JUCE__.backend.emitEvent('exportchunk', {
+          n: parseInt(params.n) || 0,
+          total: parseInt(params.total) || 1,
+          data: params.data || ''
+        });
+      } catch(e) {}
+      return;
+    }
+    _origNav.call(this, url);
+  };
+
+  // 3. Hook loadFileObj to save kick base64 to C++ for restore after minimize
   window.addEventListener('load', function() {
     setTimeout(function() {
-      var btn = document.getElementById('btnExport');
-      if (btn) {
-        btn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          window.__kickcraft__.exportKick();
-        });
-      }
-
-      // 3. Hook loadFileObj to save kick base64 to C++
       if (typeof loadFileObj === 'function') {
         var _orig = loadFileObj;
         window.loadFileObj = function(file) {
