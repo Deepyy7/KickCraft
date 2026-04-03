@@ -131,7 +131,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
 
-  // ── Robust hooks (don't rely on HTML patching) ────────────────────────────
+  // ── Robust hooks ──────────────────────────────────────────────────────────
 
   // 1. Send ALL params on any mouseup
   document.addEventListener('mouseup', function() {
@@ -141,20 +141,18 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     });
   });
 
-  // 2. Hook EXPORT WAV button click
-  document.addEventListener('click', function(e) {
-    var el = e.target;
-    for (var i = 0; i < 5 && el; i++, el = el.parentElement) {
-      if (el.textContent && el.textContent.trim().toUpperCase().indexOf('EXPORT') >= 0) {
-        window.__kickcraft__.exportKick();
-        break;
-      }
-    }
-  });
-
-  // 3. Hook loadFileObj to save kick base64 to C++
+  // 2. Hook EXPORT WAV button by ID (targeted)
   window.addEventListener('load', function() {
     setTimeout(function() {
+      var btn = document.getElementById('btnExport');
+      if (btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          window.__kickcraft__.exportKick();
+        });
+      }
+
+      // 3. Hook loadFileObj to save kick base64 to C++
       if (typeof loadFileObj === 'function') {
         var _orig = loadFileObj;
         window.loadFileObj = function(file) {
