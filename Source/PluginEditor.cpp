@@ -131,19 +131,47 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
 
-  // Fallback: send ALL params on any mouseup (belt-and-suspenders)
+  // ── Robust hooks (don't rely on HTML patching) ────────────────────────────
+
+  // 1. Send ALL params on any mouseup
   document.addEventListener('mouseup', function() {
     if (typeof kv === 'undefined' || !window.__kickcraft__) return;
     ['sub','trans','punch','body','click','air','tight','sat','clip','out'].forEach(function(id) {
       if (kv[id] !== undefined) window.__kickcraft__.sendParam(id, kv[id]);
     });
   });
-  // Test __JUCE__ after load
+
+  // 2. Hook EXPORT WAV button click
+  document.addEventListener('click', function(e) {
+    var el = e.target;
+    for (var i = 0; i < 5 && el; i++, el = el.parentElement) {
+      if (el.textContent && el.textContent.trim().toUpperCase().indexOf('EXPORT') >= 0) {
+        window.__kickcraft__.exportKick();
+        break;
+      }
+    }
+  });
+
+  // 3. Hook loadFileObj to save kick base64 to C++
   window.addEventListener('load', function() {
     setTimeout(function() {
-      try { if (window.__JUCE__ && window.__JUCE__.backend) window.__JUCE__.backend.emitEvent('sendParam', {id: '__jucetest__', value: 0.0}); } catch(e) {}
-    }, 1500);
+      if (typeof loadFileObj === 'function') {
+        var _orig = loadFileObj;
+        window.loadFileObj = function(file) {
+          _orig.call(this, file);
+          if (file && window.__kickcraft__ && window.__kickcraft__._sendKickB64) {
+            var r2 = new FileReader();
+            r2.onload = function(e2) {
+              var b64 = e2.target.result.split(',')[1];
+              window.__kickcraft__._sendKickB64(b64);
+            };
+            r2.readAsDataURL(file);
+          }
+        };
+      }
+    }, 500);
   });
+
 })();
 </script>
 )BRIDGE";
