@@ -166,7 +166,8 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    processedHtml = html;
+    // TEST: minimal HTML to confirm WebView2 renders
+    processedHtml = juce::String("<html><body style='background:#c00;color:#fff;font-size:40px'><h1>WebView2 OK</h1></body></html>");
     webView.goToURL (webView.getResourceProviderRoot());
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
@@ -398,5 +399,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith (webView.getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith ("https://juce.backend") || url.startsWith ("data:") || url.startsWith ("blob:");
 }
