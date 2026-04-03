@@ -2,16 +2,6 @@
 #include <BinaryData.h>
 
 
-// ─── File logger (works in Release) ──────────────────────────────────────────
-static void kcLog (const juce::String& msg)
-{
-    auto f = juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
-                 .getChildFile ("kickcraft_log.txt");
-    f.appendText (juce::Time::getCurrentTime().toString (true, true, true, true)
-                  + "  " + msg + "\n");
-}
-
-
 // ─── KickWebView constructor ──────────────────────────────────────────────────
 KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
     : juce::WebBrowserComponent (
@@ -25,14 +15,10 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
             .withKeepPageLoadedWhenBrowserIsHidden()
             .withNativeIntegrationEnabled()
             .withResourceProvider (
-                [&o](const juce::String& reqUrl) -> std::optional<juce::WebBrowserComponent::Resource>
+                [&o](const juce::String&) -> std::optional<juce::WebBrowserComponent::Resource>
                 {
-                    kcLog ("resourceProvider called url=" + reqUrl + " len=" + juce::String (o.processedHtml.length()));
                     if (o.processedHtml.isEmpty())
-                    {
-                        kcLog ("processedHtml EMPTY - returning nullopt");
                         return std::nullopt;
-                    }
                     auto utf8 = o.processedHtml.toUTF8();
                     const auto* begin = reinterpret_cast<const std::byte*> (utf8.getAddress());
                     const auto* end   = begin + std::strlen (utf8.getAddress());
@@ -60,10 +46,7 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                         p->processor.savedKickB64 = b64;
                     });
                 })),
-      owner (o)
-    {
-        kcLog ("KickWebView constructor complete");
-    }
+      owner (o) {}
 
 
 KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
@@ -184,10 +167,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
     );
 
     processedHtml = html;
-    kcLog ("processedHtml length=" + juce::String (processedHtml.length()));
-    auto root = webView.getResourceProviderRoot();
-    kcLog ("resourceProviderRoot=" + root);
-    webView.goToURL (root);
+    webView.goToURL (webView.getResourceProviderRoot());
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
     for (int i=0; ids[i]; ++i) processor.apvts.addParameterListener(ids[i], this);
@@ -350,7 +330,6 @@ void KickCraftEditor::syncAllParamsToUI()
 // ─── WebView URL interception ─────────────────────────────────────────────────
 bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
 {
-    kcLog ("pageAboutToLoad url=" + url);
     if (url.startsWith ("juce://chunk"))
     {
         juce::String query = url.fromFirstOccurrenceOf ("?", false, false);
@@ -419,5 +398,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith (getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith (webView.getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
 }
