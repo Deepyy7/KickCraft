@@ -135,6 +135,19 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
 )BRIDGE";
 
     html = html.replace ("</body>", bridge + "\n</body>");
+    // Inject error catcher at top of <head> or after <body>
+    juce::String errCatcher = R"ERR(<script>
+window.onerror = function(msg, src, line, col, err) {
+  document.body.style.cssText = 'background:#00008b;color:#fff;font-size:18px;padding:20px;font-family:monospace;';
+  document.body.innerHTML = '<h2>JS ERROR</h2><p>' + msg + '</p><p>' + src + ' line:' + line + '</p><pre>' + (err && err.stack ? err.stack : '') + '</pre>';
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  document.body.style.cssText = 'background:#00008b;color:#fff;font-size:18px;padding:20px;font-family:monospace;';
+  document.body.innerHTML = '<h2>PROMISE ERROR</h2><p>' + e.reason + '</p>';
+});
+</script>)ERR";
+    html = html.replace ("<body", errCatcher + "\n<body");
 
     // Patch knob mouseup — send param to C++
     html = html.replace (
@@ -166,8 +179,7 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
         "}"
     );
 
-    // TEST: minimal HTML to confirm WebView2 renders
-    processedHtml = juce::String("<html><body style='background:#c00;color:#fff;font-size:40px'><h1>WebView2 OK</h1></body></html>");
+    processedHtml = html;
     webView.goToURL (webView.getResourceProviderRoot());
 
     static const char* ids[] = {"sub","trans","punch","body","click","air","tight","sat","clip","out",nullptr};
@@ -399,5 +411,5 @@ bool KickCraftEditor::KickWebView::pageAboutToLoad (const juce::String& url)
         return false;
     }
 
-    return url.startsWith ("https://juce.backend") || url.startsWith ("data:") || url.startsWith ("blob:");
+    return url.startsWith (webView.getResourceProviderRoot()) || url.startsWith ("data:") || url.startsWith ("blob:");
 }
