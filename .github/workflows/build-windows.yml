@@ -24,8 +24,24 @@ jobs:
       - name: Build VST3
         run: cmake --build build_release --config Release --target KickCraft_VST3
 
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          # Install NSIS
+          choco install nsis -y
+          # Copy VST3 next to NSI script
+          Copy-Item -Recurse "build_release\KickCraft_artefacts\Release\VST3\KickCraft.vst3" "installer\KickCraft.vst3"
+          # Build installer
+          & "C:\Program Files (x86)\NSIS\makensis.exe" "installer\KickCraft.nsi"
+
       - name: Upload VST3 artifact
         uses: actions/upload-artifact@v4
         with:
           name: KickCraft-VST3-Windows
           path: build_release/KickCraft_artefacts/Release/VST3/
+
+      - name: Upload Installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KickCraft-Installer-Windows
+          path: installer/KickCraft-Setup.exe
