@@ -29,7 +29,6 @@ KickCraftEditor::KickWebView::KickWebView (KickCraftEditor& o)
                 [p = &o](const juce::var& data) {
                     auto id  = data["id"].toString();
                     auto val = static_cast<float> (static_cast<double> (data["value"]));
-                    kcLog ("sendParam RECEIVED id=" + id + " val=" + juce::String (val, 4));
                     juce::MessageManager::callAsync ([p, id, val] {
                         if (auto* param = p->processor.apvts.getParameter (id))
                             param->setValueNotifyingHost (
@@ -132,21 +131,17 @@ KickCraftEditor::KickCraftEditor (KickCraftProcessor& p)
   };
 
 
-  // Fallback: send ALL params on any mouseup (doesn't rely on HTML patching)
+  // Fallback: send ALL params on any mouseup (belt-and-suspenders)
   document.addEventListener('mouseup', function() {
     if (typeof kv === 'undefined' || !window.__kickcraft__) return;
-    var ids = ['sub','trans','punch','body','click','air','tight','sat','clip','out'];
-    ids.forEach(function(id) { if (kv[id] !== undefined) window.__kickcraft__.sendParam(id, kv[id]); });
+    ['sub','trans','punch','body','click','air','tight','sat','clip','out'].forEach(function(id) {
+      if (kv[id] !== undefined) window.__kickcraft__.sendParam(id, kv[id]);
+    });
   });
-
-  // Test __JUCE__ availability after page load
+  // Test __JUCE__ after load
   window.addEventListener('load', function() {
     setTimeout(function() {
-      try {
-        if (window.__JUCE__ && window.__JUCE__.backend) {
-          window.__JUCE__.backend.emitEvent('sendParam', {id: '__jucetest__', value: 0.0});
-        }
-      } catch(e) {}
+      try { if (window.__JUCE__ && window.__JUCE__.backend) window.__JUCE__.backend.emitEvent('sendParam', {id: '__jucetest__', value: 0.0}); } catch(e) {}
     }, 1500);
   });
 })();
