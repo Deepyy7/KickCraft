@@ -384,16 +384,15 @@ void KickCraftEditor::syncAllParamsToUI()
         webView.evaluateJavascript (js);
     }
 
-    // Restore previously loaded kick — chunked to stay under WKWebView JS size limit.
-    // Guard: only start once per editor open, never re-trigger on knob changes.
-    if (processor.savedKickB64.isNotEmpty() && !kickRestoreDone && kickRestoreIdx < 0)
+    // Restore previously loaded kick — send entire base64 in one evaluateJavascript call.
+    // base64 chars (A-Z a-z 0-9 + / =) are safe in JS single-quoted strings.
+    if (processor.savedKickB64.isNotEmpty() && !kickRestoreDone)
     {
-        kickRestoreChunks.clear();
-        const int CHUNK = 4000;
-        const juce::String& b64 = processor.savedKickB64;
-        for (int pos = 0; pos < b64.length(); pos += CHUNK)
-            kickRestoreChunks.add (b64.substring (pos, pos + CHUNK));
-        kickRestoreIdx = 0;   // timerCallback sends one chunk per tick
+        webView.evaluateJavascript (
+            "if(window.__kickcraft__&&window.__kickcraft__.restoreKickFromB64)"
+            "window.__kickcraft__.restoreKickFromB64('"
+            + processor.savedKickB64 + "');");
+        kickRestoreDone = true;
     }
 }
 
