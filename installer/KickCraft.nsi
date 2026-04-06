@@ -4,7 +4,7 @@
 !define PRODUCT_NAME "KickCraft"
 !define PRODUCT_VERSION "1.0.0"
 !define PRODUCT_PUBLISHER "Gravitas Audio"
-!define VST3_DIR "$COMMONFILES\VST3"
+!define VST3_DIR "$COMMONFILES64\VST3"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "KickCraft-Setup.exe"
@@ -26,17 +26,19 @@ ShowInstDetails show
 !insertmacro MUI_LANGUAGE "English"
 
 Section "KickCraft VST3" SecMain
+  SetRegView 64
   SetOutPath "${VST3_DIR}"
   File /r "KickCraft.vst3"
 
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayName" "${PRODUCT_NAME}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "Publisher" "${PRODUCT_PUBLISHER}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString" '"$COMMONFILES\VST3\KickCraft.vst3\uninstall.exe"'
-  WriteUninstaller "$COMMONFILES\VST3\KickCraft.vst3\uninstall.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}" "UninstallString" '"$COMMONFILES64\VST3\KickCraft.vst3\uninstall.exe"'
+  WriteUninstaller "$COMMONFILES64\VST3\KickCraft.vst3\uninstall.exe"
 SectionEnd
 
 Section "Uninstall"
+  SetRegView 64
   RMDir /r "${VST3_DIR}\KickCraft.vst3"
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 SectionEnd
